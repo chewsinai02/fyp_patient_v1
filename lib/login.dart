@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dashboard.dart';
+import 'services/database_service.dart';
+import 'pages/main_layout.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,6 +14,12 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  // Add loading state
+  bool _isLoading = false;
+
+  // Add error message state
+  String? _errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -125,12 +133,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildLoginButton() {
     return GestureDetector(
-      onTap: () {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()),
-        );
-      },
+      onTap: _isLoading ? null : _handleLogin, // Disable when loading
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -147,17 +150,73 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ],
         ),
-        child: const Center(
-          child: Text(
-            'Login',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+        child: Center(
+          child: _isLoading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text(
+                  'Login',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
       ),
     );
+  }
+
+  // Add login handler method
+  Future<void> _handleLogin() async {
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+
+    try {
+      print('Login attempt started'); // Debug log
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      print('Email: $email'); // Add this debug print
+      print('Attempting database authentication'); // Debug log
+      final user =
+          await DatabaseService.instance.authenticateUser(email, password);
+      print('Authentication response: $user'); // Add this debug print
+
+      if (user == null) {
+        print('Authentication failed - invalid credentials'); // Debug log
+        throw 'Invalid email or password';
+      }
+
+      print('Authentication successful - navigating to dashboard'); // Debug log
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MainLayout(userData: user),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Login error: $e'); // Debug log
+      setState(() {
+        _errorMessage = e.toString();
+      });
+
+      // Add a SnackBar to show the error to the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_errorMessage ?? 'An error occurred'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 }

@@ -1,7 +1,38 @@
 import 'package:flutter/material.dart';
+import '../services/database_service.dart';
 
-class DoctorsPage extends StatelessWidget {
+class DoctorsPage extends StatefulWidget {
   const DoctorsPage({super.key});
+
+  @override
+  State<DoctorsPage> createState() => _DoctorsPageState();
+}
+
+class _DoctorsPageState extends State<DoctorsPage> {
+  final DatabaseService _db = DatabaseService.instance;
+  List<Map<String, dynamic>> _doctors = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDoctors();
+  }
+
+  Future<void> _loadDoctors() async {
+    try {
+      final doctors = await _db.getDoctors();
+      setState(() {
+        _doctors = doctors;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading doctors: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,19 +43,22 @@ class DoctorsPage extends StatelessWidget {
           children: [
             _buildHeader(context),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: 5, // Number of doctors
-                itemBuilder: (context, index) {
-                  return _buildDoctorCard(
-                    name: 'Dr. Sarah Johnson',
-                    specialty: 'Cardiologist',
-                    experience: '15 years',
-                    rating: 4.9,
-                    isAvailable: true,
-                  );
-                },
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(20),
+                      itemCount: _doctors.length,
+                      itemBuilder: (context, index) {
+                        final doctor = _doctors[index];
+                        return _buildDoctorCard(
+                          name: doctor['name'],
+                          specialty: doctor['specialty'],
+                          experience: doctor['experience'],
+                          rating: doctor['rating'],
+                          isAvailable: doctor['isAvailable'],
+                        );
+                      },
+                    ),
             ),
           ],
         ),

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../dashboard.dart';
 import 'chat_page.dart';
-import 'appointment_page.dart';
+import '../appointment_page.dart';
 import 'profile_page.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final Map<String, dynamic> userData;
+  const MainLayout({super.key, required this.userData});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -14,12 +15,18 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
-    const ChatPage(),
-    const AppointmentPage(),
-    const ProfilePage(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      DashboardContent(userData: widget.userData),
+      const ChatPage(),
+      const AppointmentPage(),
+      const ProfilePage(),
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -32,27 +39,24 @@ class _MainLayoutState extends State<MainLayout> {
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        height: 65,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(32),
-          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -10),
+              color: Colors.grey.withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.message_outlined, 'Chat', 1),
-            _buildNavItem(Icons.calendar_today_outlined, 'Appointments', 2),
-            _buildNavItem(Icons.person_outline, 'Profile', 3),
+            _buildNavItem(Icons.home_rounded, 'Home', 0),
+            _buildNavItem(Icons.chat_bubble_rounded, 'Chat', 1),
+            _buildNavItem(Icons.calendar_month_rounded, 'Appointments', 2),
+            _buildNavItem(Icons.person_rounded, 'Profile', 3),
           ],
         ),
       ),
@@ -63,32 +67,33 @@ class _MainLayoutState extends State<MainLayout> {
     final isSelected = _selectedIndex == index;
     return InkWell(
       onTap: () => _onItemTapped(index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? Colors.deepPurple.withOpacity(0.1)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.deepPurple.withOpacity(0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
               icon,
-              color: isSelected ? Colors.deepPurple : Colors.grey,
+              color: isSelected ? Colors.deepPurple : Colors.grey.shade600,
+              size: 24,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.deepPurple : Colors.grey,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.deepPurple : Colors.grey.shade600,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

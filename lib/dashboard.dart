@@ -8,84 +8,40 @@ import 'pages/profile_page.dart';
 import 'pages/daily_tasks_page.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  final Map<String, dynamic> userData;
+  const DashboardPage({super.key, required this.userData});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  int _selectedIndex = 0;
-
-  // Define your page widgets here
-  final List<Widget> _pages = [
-    const DashboardContent(),
-    const ChatPage(),
-    const AppointmentPage(),
-    const ProfilePage(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        currentIndex: _selectedIndex,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_outlined),
-            activeIcon: Icon(Icons.chat),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Appointments',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-        onTap: _onItemTapped,
-      ),
+      body: DashboardContent(userData: widget.userData),
     );
   }
 }
 
 // Extract the current dashboard content into a separate widget
 class DashboardContent extends StatelessWidget {
-  const DashboardContent({super.key});
+  final Map<String, dynamic> userData;
+  const DashboardContent({super.key, required this.userData});
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          // App Bar
+          // App Bar with reduced height
           SliverAppBar(
-            expandedHeight: 200.0,
+            expandedHeight: 150.0,
             floating: false,
             pinned: true,
+            elevation: 0,
+            automaticallyImplyLeading: false,
             backgroundColor: Colors.deepPurple,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
@@ -96,56 +52,107 @@ class DashboardContent extends StatelessWidget {
                     colors: [Colors.deepPurple, Colors.deepPurple.shade300],
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                child: SafeArea(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundImage: AssetImage('assets/profile.jpg'),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Welcome back,',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 16,
-                                ),
+                      // Top section - Buttons
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Dashboard',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Text(
-                                'John Doe',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  onPressed: () {},
                                 ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(
+                                    Icons.settings_outlined,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  onPressed: () {},
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Bottom section - Profile info
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                                borderRadius: BorderRadius.circular(30),
                               ),
-                            ],
-                          ),
-                        ],
+                              child: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.white,
+                                backgroundImage: userData[
+                                            'assets/' + 'profile_picture'] !=
+                                        null
+                                    ? NetworkImage(
+                                        userData['assets/' + 'profile_picture'])
+                                    : const AssetImage(
+                                            'assets/images/profile.png')
+                                        as ImageProvider,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'Welcome back,',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  userData['name'] ?? 'User',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () {},
-              ),
-            ],
           ),
 
           // Progress Section
