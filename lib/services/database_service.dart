@@ -917,63 +917,97 @@ class DatabaseService {
       print('\n=== FETCHING REPORT DETAILS START ===');
       print('Report ID: $reportId');
 
+      // First verify if the report exists
+      final reportCheck = await conn.query(
+        'SELECT id FROM reports WHERE id = ?',
+        [reportId],
+      );
+      print('Report exists: ${reportCheck.isNotEmpty}');
+
+      if (reportCheck.isEmpty) {
+        print('Report not found with ID: $reportId');
+        return null;
+      }
+
       final query = '''
         SELECT 
-          r.*,
+          r.id,
+          r.title,
+          r.diagnosis,
+          r.report_date,
+          r.symptoms,
+          r.treatment_plan,
+          r.medications,
+          r.blood_pressure_systolic,
+          r.blood_pressure_diastolic,
+          r.heart_rate,
+          r.temperature,
+          r.respiratory_rate,
+          r.lab_results,
+          r.status,
           p.name as patient_name,
           p.gender,
           p.contact_number,
           p.profile_picture,
           d.name as doctor_name
-        FROM reports r  // Changed from medical_reports to reports
-        JOIN users p ON r.patient_id = p.id
-        JOIN users d ON r.doctor_id = d.id
+        FROM reports r
+        LEFT JOIN users p ON r.patient_id = p.id
+        LEFT JOIN users d ON r.doctor_id = d.id
         WHERE r.id = ?
       ''';
 
-      print('\nExecuting query:');
-      print(query);
-      print('Parameters: [$reportId]');
-
+      print('\nExecuting query with ID: $reportId');
       final results = await conn.query(query, [reportId]);
-      print('\nQuery results:');
-      print('Number of results found: ${results.length}');
 
       if (results.isEmpty) {
-        print('No report found with ID: $reportId');
+        print('No results found after join');
         return null;
       }
 
       final row = results.first;
-      print('\nProcessing report data:');
-      print('Title: ${row['title']}');
-      print('Patient: ${row['patient_name']}');
-      print('Doctor: ${row['doctor_name']}');
+      print('\nProcessing row data:');
+      print('Report ID: ${row['id']}');
 
+      // Helper function to convert BLOB to String
+      String? blobToString(dynamic value) {
+        if (value == null) return null;
+        if (value is String) return value;
+        if (value is Blob) {
+          return String.fromCharCodes(value.toString().codeUnits);
+        }
+        return value.toString();
+      }
+
+      // Build the report details map with BLOB handling
       final reportDetails = {
         'id': row['id'],
-        'title': row['title'],
-        'patient_name': row['patient_name'],
-        'patient_gender': row['gender'],
-        'patient_contact': row['contact_number'],
-        'patient_profile': row['profile_picture'],
-        'doctor_name': row['doctor_name'],
-        'report_date': row['report_date'],
-        'symptoms': row['symptoms'],
-        'diagnosis': row['diagnosis'],
-        'treatment_plan': row['treatment_plan'],
-        'medications': row['medications'],
-        'blood_pressure':
-            '${row['blood_pressure_systolic']}/${row['blood_pressure_diastolic']}',
-        'heart_rate': row['heart_rate'],
-        'temperature': row['temperature'],
-        'respiratory_rate': row['respiratory_rate'],
-        'lab_results': row['lab_results'],
-        'status': row['status'],
+        'title': blobToString(row['title']) ?? 'Untitled Report',
+        'patient_name': blobToString(row['patient_name']) ?? 'Unknown Patient',
+        'patient_gender': blobToString(row['gender']) ?? 'Not Specified',
+        'patient_contact': blobToString(row['contact_number']) ?? 'No Contact',
+        'patient_profile': blobToString(row['profile_picture']),
+        'doctor_name': blobToString(row['doctor_name']) ?? 'Unknown Doctor',
+        'report_date': row['report_date']?.toString() ?? 'No Date',
+        'symptoms': blobToString(row['symptoms']) ?? 'No symptoms recorded',
+        'diagnosis': blobToString(row['diagnosis']) ?? 'No diagnosis recorded',
+        'treatment_plan':
+            blobToString(row['treatment_plan']) ?? 'No treatment plan recorded',
+        'medications':
+            blobToString(row['medications']) ?? 'No medications recorded',
+        'blood_pressure': row['blood_pressure_systolic'] != null &&
+                row['blood_pressure_diastolic'] != null
+            ? '${row['blood_pressure_systolic']}/${row['blood_pressure_diastolic']}'
+            : 'Not recorded',
+        'heart_rate': row['heart_rate']?.toString() ?? 'Not recorded',
+        'temperature': row['temperature']?.toString() ?? 'Not recorded',
+        'respiratory_rate':
+            row['respiratory_rate']?.toString() ?? 'Not recorded',
+        'lab_results': blobToString(row['lab_results']) ?? 'No lab results',
+        'status': blobToString(row['status']) ?? 'pending',
       };
 
       print('\nReport details processed successfully');
-      print('=== FETCHING REPORT DETAILS END ===\n');
+      print('Returning data: $reportDetails');
       return reportDetails;
     } catch (e, stackTrace) {
       print('\n=== ERROR FETCHING REPORT DETAILS ===');

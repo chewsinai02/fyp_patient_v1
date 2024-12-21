@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import 'package:intl/intl.dart';
+import 'report_details_page.dart';
 
 class ReportsPage extends StatefulWidget {
   final int patientId;
@@ -140,17 +141,34 @@ class _ReportsPageState extends State<ReportsPage> {
       child: InkWell(
         onTap: () {
           print('\n=== NAVIGATING TO REPORT DETAILS ===');
-          print('Report ID: ${report['id']}');
-          Navigator.pushNamed(
-            context,
-            '/report_details',
-            arguments: report['id'],
-          ).then((_) {
-            // Refresh the reports list when returning from details
-            setState(() {
-              _loadReports();
-            });
-          });
+          print('Full report data: $report');
+          final reportId = report['id'];
+          print('Report ID: $reportId (${reportId.runtimeType})');
+
+          if (reportId == null) {
+            print('Error: Report ID is null!');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Error: Invalid report ID')),
+            );
+            return;
+          }
+
+          try {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) {
+                  print('Building ReportDetailsPage with ID: $reportId');
+                  return ReportDetailsPage(reportId: reportId);
+                },
+              ),
+            );
+          } catch (e) {
+            print('Navigation error: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $e')),
+            );
+          }
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(

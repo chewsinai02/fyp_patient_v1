@@ -9,43 +9,112 @@ class ReportDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('\n=== BUILDING REPORT DETAILS PAGE ===');
+    print('Report ID: $reportId');
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Report Details',
+          style: TextStyle(color: Colors.black),
+        ),
+      ),
       body: SafeArea(
         child: FutureBuilder<Map<String, dynamic>?>(
           future: DatabaseService.instance.getReportDetails(reportId),
           builder: (context, snapshot) {
+            print('FutureBuilder state: ${snapshot.connectionState}');
+            print('Snapshot data: ${snapshot.data}');
+            print('Snapshot error: ${snapshot.error}');
+
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
             }
 
             if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
+              print('Error loading report details: ${snapshot.error}');
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
+              );
             }
 
             final report = snapshot.data;
             if (report == null) {
-              return const Center(child: Text('Report not found'));
+              print('No report data found');
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.folder_off_outlined,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Report not found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
+              );
             }
 
-            return Column(
-              children: [
-                _buildHeader(context, report),
-                Expanded(
-                  child: ListView(
+            print('Report data loaded successfully: $report');
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildHeader(context, report),
+                  Padding(
                     padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildPatientInfo(report),
-                      const SizedBox(height: 16),
-                      _buildVitalSigns(report),
-                      const SizedBox(height: 16),
-                      _buildClinicalInfo(report),
-                      const SizedBox(height: 16),
-                      _buildDiagnosisTreatment(report),
-                    ],
+                    child: Column(
+                      children: [
+                        _buildPatientInfo(report),
+                        const SizedBox(height: 16),
+                        _buildVitalSigns(report),
+                        const SizedBox(height: 16),
+                        _buildClinicalInfo(report),
+                        const SizedBox(height: 16),
+                        _buildDiagnosisTreatment(report),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         ),
