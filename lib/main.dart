@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'login.dart';
+import 'pages/report_details_page.dart';
 
 void main() {
   SystemChrome.setSystemUIOverlayStyle(
@@ -27,6 +28,20 @@ class MyApp extends StatelessWidget {
       home: const InitialPage(),
       routes: {
         '/login': (context) => const LoginPage(),
+        '/report_details': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments;
+          print('\n=== BUILDING REPORT DETAILS PAGE ===');
+          print('Route arguments: $args');
+          if (args is! int) {
+            print('Error: Invalid report ID type');
+            return const Scaffold(
+              body: Center(
+                child: Text('Error: Invalid report ID'),
+              ),
+            );
+          }
+          return ReportDetailsPage(reportId: args);
+        },
       },
     );
   }

@@ -763,24 +763,20 @@ class DatabaseService {
       }
 
       final messages = results.map((row) {
+        // Convert Blob to String if necessary
         String messageText = row['message'] is Blob
             ? String.fromCharCodes((row['message'] as Blob).toBytes())
             : row['message'].toString();
 
-        String? imagePath =
-            row['image'] != null ? 'assets/${row['image']}' : null;
-
-        print('Processing message:');
-        print('ID: ${row['id']}');
-        print('Sender: ${row['sender_id']}');
-        print('Image path: $imagePath');
+        print(
+            'Processing message: ID=${row['id']}, Sender=${row['sender_id']}, Receiver=${row['receiver_id']}');
 
         return Message.fromMap({
           'id': row['id'],
           'sender_id': row['sender_id'],
           'receiver_id': row['receiver_id'],
           'message': messageText,
-          'image': imagePath,
+          'image': row['image'] != null ? 'assets/${row['image']}' : null,
           'created_at': row['created_at'].toString(),
           'updated_at': row['updated_at'].toString(),
           'is_read': row['is_read'] ?? false,
@@ -806,93 +802,18 @@ class DatabaseService {
     }
   }
 
-  // Add this method to handle image uploads
-  Future<String?> uploadImage(File imageFile) async {
-    try {
-      // Generate a unique filename
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final filename = 'chat_image_$timestamp.png';
-      final relativePath = 'chat_images/$filename';
-
-      // Use app's local path instead of current directory
-      final String appPath = 'assets'; // Change to use direct assets path
-      final String assetPath = '$appPath/$relativePath';
-
-      print('=== UPLOADING IMAGE ===');
-      print('Original file path: ${imageFile.path}');
-      print('Target path: $assetPath');
-
-      // Ensure the directory exists
-      final directory = Directory('$appPath/chat_images');
-      if (!directory.existsSync()) {
-        print('Creating directory: ${directory.path}');
-        directory.createSync(recursive: true);
-      }
-
-      // Verify source file exists
-      if (!imageFile.existsSync()) {
-        print('Error: Source image file does not exist at ${imageFile.path}');
-        return null;
-      }
-
-      // Copy the file
-      try {
-        final File newImage = await imageFile.copy(assetPath);
-
-        if (!newImage.existsSync()) {
-          print('Error: Image file was not created at $assetPath');
-          return null;
-        }
-
-        print('Image saved successfully at: $assetPath');
-        print('Relative path for database: $relativePath');
-        return relativePath;
-      } catch (e) {
-        print('Error copying file: $e');
-        return null;
-      }
-    } catch (e, stackTrace) {
-      print('=== ERROR UPLOADING IMAGE ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      return null;
-    }
-  }
-
-  // Modify the sendMessage method to handle images
   Future<void> sendMessage({
     required int senderId,
     required int receiverId,
     required String message,
-    File? imageFile,
+    String? image,
   }) async {
     try {
       final conn = await connection;
-      String? imagePath;
-
-      if (imageFile != null) {
-        print('=== SENDING MESSAGE WITH IMAGE ===');
-        print('Image file path: ${imageFile.path}');
-        print('File exists: ${imageFile.existsSync()}');
-        print('File size: ${await imageFile.length()} bytes');
-
-        imagePath = await uploadImage(imageFile);
-        if (imagePath == null) {
-          print('Failed to upload image - imagePath is null');
-          throw Exception('Failed to upload image');
-        }
-        print('Image uploaded successfully. DB path: $imagePath');
-      }
+      print('Sending message from $senderId to $receiverId: $message');
 
       final timestamp = DateTime.now().toUtc().toString();
-      print('Inserting message into database:');
-      print('Sender ID: $senderId');
-      print('Receiver ID: $receiverId');
-      print('Message: $message');
-      print('Image Path: $imagePath');
-      print('Timestamp: $timestamp');
-
-      final result = await conn.query('''
+      await conn.query('''
         INSERT INTO messages (
           sender_id, 
           receiver_id, 
@@ -902,14 +823,163 @@ class DatabaseService {
           updated_at, 
           is_read
         ) VALUES (?, ?, ?, ?, ?, ?, 0)
-      ''', [senderId, receiverId, message, imagePath, timestamp, timestamp]);
+      ''', [senderId, receiverId, message, image, timestamp, timestamp]);
 
-      print('Message inserted successfully. ID: ${result.insertId}');
+      print('Message sent successfully');
+    } catch (e) {
+      print('Error sending message: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getReports(int patientId) async {
+    try {
+      final conn = await connection;
+      print('\n=== FETCHING REPORTS START ===');
+      print('Patient ID: $patientId');
+
+      // First, verify the patient exists
+      final patientCheck = await conn.query(
+        'SELECT id, name FROM users WHERE id = ?',
+        [patientId],
+      );
+      print(
+          'Patient check result: ${patientCheck.length > 0 ? 'Found' : 'Not found'}');
+
+      // Get total reports count for this patient
+      final countResult = await conn.query(
+        'SELECT COUNT(*) as count FROM reports WHERE patient_id = ?',
+        [patientId],
+      );
+      print('Total reports in database: ${countResult.first['count']}');
+
+      final query = '''
+        SELECT 
+          id,
+          title,
+          diagnosis,
+          report_date,
+          status,
+          created_at,
+          patient_id
+        FROM reports 
+        WHERE patient_id = ?
+        AND deleted_at IS NULL
+        ORDER BY created_at DESC
+      ''';
+
+      print('\nExecuting query:');
+      print(query);
+      print('Parameters: [$patientId]');
+
+      final results = await conn.query(query, [patientId]);
+      print('\nQuery results:');
+      print('Number of reports found: ${results.length}');
+
+      if (results.isEmpty) {
+        print('No reports found for patient ID: $patientId');
+        return [];
+      }
+
+      List<Map<String, dynamic>> reports = [];
+      for (var row in results) {
+        print('\nProcessing row:');
+        print('ID: ${row['id']}');
+        print('Title: ${row['title']}');
+        print('Patient ID: ${row['patient_id']}');
+        print('Status: ${row['status']}');
+
+        final report = {
+          'id': row['id'],
+          'title': row['title'],
+          'diagnosis': row['diagnosis'],
+          'report_date': row['report_date'],
+          'status': row['status'],
+          'created_at': row['created_at'],
+        };
+        reports.add(report);
+      }
+
+      print('\nProcessed ${reports.length} reports successfully');
+      print('=== FETCHING REPORTS END ===\n');
+      return reports;
     } catch (e, stackTrace) {
-      print('=== ERROR SENDING MESSAGE ===');
+      print('\n=== ERROR FETCHING REPORTS ===');
       print('Error: $e');
       print('Stack trace: $stackTrace');
-      rethrow;
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getReportDetails(int reportId) async {
+    try {
+      final conn = await connection;
+      print('\n=== FETCHING REPORT DETAILS START ===');
+      print('Report ID: $reportId');
+
+      final query = '''
+        SELECT 
+          r.*,
+          p.name as patient_name,
+          p.gender,
+          p.contact_number,
+          p.profile_picture,
+          d.name as doctor_name
+        FROM reports r  // Changed from medical_reports to reports
+        JOIN users p ON r.patient_id = p.id
+        JOIN users d ON r.doctor_id = d.id
+        WHERE r.id = ?
+      ''';
+
+      print('\nExecuting query:');
+      print(query);
+      print('Parameters: [$reportId]');
+
+      final results = await conn.query(query, [reportId]);
+      print('\nQuery results:');
+      print('Number of results found: ${results.length}');
+
+      if (results.isEmpty) {
+        print('No report found with ID: $reportId');
+        return null;
+      }
+
+      final row = results.first;
+      print('\nProcessing report data:');
+      print('Title: ${row['title']}');
+      print('Patient: ${row['patient_name']}');
+      print('Doctor: ${row['doctor_name']}');
+
+      final reportDetails = {
+        'id': row['id'],
+        'title': row['title'],
+        'patient_name': row['patient_name'],
+        'patient_gender': row['gender'],
+        'patient_contact': row['contact_number'],
+        'patient_profile': row['profile_picture'],
+        'doctor_name': row['doctor_name'],
+        'report_date': row['report_date'],
+        'symptoms': row['symptoms'],
+        'diagnosis': row['diagnosis'],
+        'treatment_plan': row['treatment_plan'],
+        'medications': row['medications'],
+        'blood_pressure':
+            '${row['blood_pressure_systolic']}/${row['blood_pressure_diastolic']}',
+        'heart_rate': row['heart_rate'],
+        'temperature': row['temperature'],
+        'respiratory_rate': row['respiratory_rate'],
+        'lab_results': row['lab_results'],
+        'status': row['status'],
+      };
+
+      print('\nReport details processed successfully');
+      print('=== FETCHING REPORT DETAILS END ===\n');
+      return reportDetails;
+    } catch (e, stackTrace) {
+      print('\n=== ERROR FETCHING REPORT DETAILS ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return null;
     }
   }
 }

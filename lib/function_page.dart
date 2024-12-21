@@ -171,12 +171,7 @@ class FunctionPage extends StatelessWidget {
                 title: 'Reports',
                 icon: Icons.analytics_outlined,
                 color: Colors.orange,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ReportsPage(),
-                  ),
-                ),
+                onTap: () => _navigateToReports(context),
               ),
             ),
           ],
@@ -292,6 +287,31 @@ class FunctionPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _navigateToReports(BuildContext context) {
+    final userId = AuthService.instance.currentUser?['id'];
+    print('\n=== NAVIGATING TO REPORTS ===');
+    print('Current user: ${AuthService.instance.currentUser}');
+    print('User ID: $userId');
+
+    if (userId == null) {
+      print('Warning: User ID is null!');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Could not determine user ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReportsPage(patientId: userId),
       ),
     );
   }
