@@ -280,7 +280,10 @@ class _DoctorsPageState extends State<DoctorsPage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('Book'),
+                child: const Text(
+                  'Book',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),

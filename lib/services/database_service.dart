@@ -356,7 +356,7 @@ class DatabaseService {
     required int patientId,
     required int doctorId,
     required DateTime appointmentDate,
-    required TimeOfDay appointmentTime,
+    required String appointmentTime,
     String? notes,
   }) async {
     try {
@@ -366,29 +366,72 @@ class DatabaseService {
         VALUES (?, ?, ?, ?, 'active', ?)
       ''';
 
-      // Convert TimeOfDay to a string format
-      String formattedTime =
-          '${appointmentTime.hour.toString().padLeft(2, '0')}:${appointmentTime.minute.toString().padLeft(2, '0')}';
-
       // Log the values being inserted
       print('Inserting appointment for Patient ID: $patientId');
       print('Doctor ID: $doctorId');
       print(
           'Appointment Date: ${appointmentDate.toIso8601String().split('T')[0]}');
-      print('Appointment Time: $formattedTime');
+      print('Appointment Time: $appointmentTime');
       print('Notes: $notes');
 
       await conn.query(query, [
         patientId,
         doctorId,
-        appointmentDate.toIso8601String().split('T')[0], // Convert to date
-        formattedTime, // Use formatted time
+        appointmentDate.toIso8601String().split('T')[0],
+        appointmentTime,
         notes,
       ]);
 
       print('Appointment added successfully.');
     } catch (e) {
       print('Error adding appointment: $e');
+      rethrow;
+    }
+  }
+
+  // Add this new method
+  Future<List<String>> getAvailableTimeSlots(
+      int doctorId, DateTime date) async {
+    try {
+      final conn = await connection;
+
+      // Get all booked appointments for the specified doctor and date
+      final query = '''
+        SELECT appointment_time 
+        FROM appointments 
+        WHERE doctor_id = ? 
+        AND appointment_date = ?
+        AND status = 'active'
+      ''';
+
+      final results = await conn
+          .query(query, [doctorId, date.toIso8601String().split('T')[0]]);
+
+      // Convert results to a list of booked times
+      List<String> bookedTimes =
+          results.map((row) => row['appointment_time'].toString()).toList();
+
+      // Define all possible time slots (same as in BookingPage's appointmentTimeMap)
+      final allTimeSlots = [
+        '09:00:00',
+        '09:30:00',
+        '10:00:00',
+        '10:30:00',
+        '11:00:00',
+        '11:30:00',
+        '14:00:00',
+        '14:30:00',
+        '15:00:00',
+        '15:30:00',
+        '16:00:00',
+        '16:30:00'
+      ];
+
+      // Return available time slots (those not in bookedTimes)
+      return allTimeSlots.where((time) => !bookedTimes.contains(time)).toList();
+    } catch (e) {
+      print('Error getting available time slots: $e');
+      return [];
     }
   }
 }
