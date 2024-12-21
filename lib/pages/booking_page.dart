@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
+import '../services/auth_service.dart'; // Import AuthService
 
 class BookingPage extends StatefulWidget {
   final String doctorName;
@@ -84,25 +85,39 @@ class _BookingPageState extends State<BookingPage> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (_selectedDate != null && _selectedTime != null) {
-                  _db
-                      .addAppointment(
-                    patientId: 1, // Replace with actual patient ID
-                    doctorId: widget.doctorId,
-                    appointmentDate: _selectedDate!,
-                    appointmentTime: _selectedTime!,
-                    notes: _notes,
-                  )
-                      .then((_) {
-                    Navigator.pop(context); // Go back after booking
-                  }).catchError((error) {
+                  final currentUser = AuthService.instance.getCurrentUser();
+                  if (currentUser != null) {
+                    try {
+                      await _db.addAppointment(
+                        patientId: currentUser['id'],
+                        doctorId: widget.doctorId,
+                        appointmentDate: _selectedDate!,
+                        appointmentTime: _selectedTime!,
+                        notes: _notes,
+                      );
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Appointment booked successfully!')),
+                      );
+
+                      Navigator.pop(context);
+                    } catch (error) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('Error booking appointment: $error')),
+                      );
+                    }
+                  } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $error')),
+                      const SnackBar(
+                          content: Text('Please login to book an appointment')),
                     );
-                  });
+                    Navigator.pushNamed(context, '/login');
+                  }
                 } else {
-                  // Show error message
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text('Please select date and time')),

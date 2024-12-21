@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dashboard.dart';
 import 'services/database_service.dart';
 import 'pages/main_layout.dart';
+import 'services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -174,22 +175,27 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      print('Login attempt started'); // Debug log
+      print('Login attempt started');
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      print('Email: $email'); // Add this debug print
-      print('Attempting database authentication'); // Debug log
+      print('Email: $email');
+      print('Attempting database authentication');
       final user =
           await DatabaseService.instance.authenticateUser(email, password);
-      print('Authentication response: $user'); // Add this debug print
+      print('Authentication response: $user');
 
       if (user == null) {
-        print('Authentication failed - invalid credentials'); // Debug log
+        print('Authentication failed - invalid credentials');
         throw 'Invalid email or password';
       }
 
-      print('Authentication successful - navigating to dashboard'); // Debug log
+      // Set the user data in AuthService after successful authentication
+      AuthService.instance.setCurrentUser(user);
+      final currentUser = AuthService.instance.getCurrentUser();
+      print('Verified login - Current user: $currentUser');
+
+      print('Authentication successful - navigating to dashboard');
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -199,12 +205,11 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      print('Login error: $e'); // Debug log
+      print('Login error: $e');
       setState(() {
         _errorMessage = e.toString();
       });
 
-      // Add a SnackBar to show the error to the user
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_errorMessage ?? 'An error occurred'),

@@ -3,6 +3,7 @@ import '../dashboard.dart';
 import 'chat_page.dart';
 import '../appointment_page.dart';
 import 'profile_page.dart';
+import '../services/auth_service.dart';
 
 class MainLayout extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -26,6 +27,7 @@ class _MainLayoutState extends State<MainLayout> {
       const AppointmentPage(),
       const ProfilePage(),
     ];
+    AuthService.instance.setCurrentUser(widget.userData);
   }
 
   void _onItemTapped(int index) {

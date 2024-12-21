@@ -25,6 +25,9 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Poppins',
       ),
       home: const InitialPage(),
+      routes: {
+        '/login': (context) => const LoginPage(),
+      },
     );
   }
 }
