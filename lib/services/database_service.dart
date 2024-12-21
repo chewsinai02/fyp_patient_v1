@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/message.dart';
+import 'package:intl/intl.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -214,10 +215,12 @@ class DatabaseService {
 
       // Use selected date or default to today
       final date = selectedDate ?? DateTime.now();
-      final formattedDate =
-          "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-      print('Formatted Date for Query: $formattedDate');
+      // Format start and end of day for comparison
+      final startDate = DateTime(date.year, date.month, date.day, 0, 0, 0);
+      final endDate = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+      print('Fetching tasks between: $startDate and $endDate');
 
       final query = '''
         SELECT 
@@ -230,28 +233,35 @@ class DatabaseService {
           room_id
         FROM tasks 
         WHERE patient_id = ? 
-        AND DATE(due_date) = ?
+        AND due_date BETWEEN ? AND ?
         AND deleted_at IS NULL
-        ORDER BY TIME(due_date) ASC
+        ORDER BY due_date ASC
       ''';
 
-      print('Executing Query:');
-      print(query);
-      print('Parameters: [$patientId, $formattedDate]');
+      print('Executing Query with parameters:');
+      print('Patient ID: $patientId');
+      print('Start: $startDate');
+      print('End: $endDate');
 
-      final results = await conn.query(query, [patientId, formattedDate]);
+      final results = await conn.query(query, [patientId, startDate, endDate]);
 
       print('Raw Results Count: ${results.length}');
 
       List<Map<String, dynamic>> tasks = [];
 
       for (var row in results) {
-        // Ensure due_date is properly converted to DateTime
         DateTime? dueDate;
         if (row['due_date'] != null) {
-          dueDate = row['due_date'] is DateTime
-              ? row['due_date']
-              : DateTime.parse(row['due_date'].toString());
+          if (row['due_date'] is DateTime) {
+            dueDate = row['due_date'];
+          } else {
+            try {
+              dueDate = DateTime.parse(row['due_date'].toString());
+            } catch (e) {
+              print('Error parsing due_date: ${row['due_date']}');
+              print('Error: $e');
+            }
+          }
         }
 
         final task = {
@@ -264,6 +274,7 @@ class DatabaseService {
           'due_date': dueDate,
         };
         print('Processed Task: $task');
+        print('Due Date: ${dueDate?.toString()}');
         tasks.add(task);
       }
 
@@ -486,18 +497,14 @@ class DatabaseService {
         ORDER BY m.created_at DESC
       ''', [patientId, patientId]);
 
-      print('Query executed. Raw results:');
+      print('Query executed. Raw results: ${results.length}');
       if (results.isEmpty) {
         print('No messages found for patient ID: $patientId');
       } else {
         for (var row in results) {
           print('Message ID: ${row['id']}');
           print('Sender ID: ${row['sender_id']}');
-          print('Sender Name: ${row['sender_name']}');
-          print('Sender Profile Picture: ${row['sender_profile_picture']}');
           print('Receiver ID: ${row['receiver_id']}');
-          print('Receiver Name: ${row['receiver_name']}');
-          print('Receiver Profile Picture: ${row['receiver_profile_picture']}');
           print('Message: ${row['message']}');
           print('-------------------');
         }
@@ -602,6 +609,167 @@ class DatabaseService {
       print('Error fetching appointments: $e');
       print('Stack trace: $stackTrace');
       return [];
+    }
+  }
+
+  Future<List<Message>> getLatestMessages(int patientId) async {
+    try {
+      final conn = await connection;
+      print('Fetching latest messages for patient ID: $patientId');
+
+      // Modified query to get latest message with each doctor
+      final results = await conn.query('''
+        SELECT 
+          m.*,
+          u_sender.name as sender_name,
+          u_sender.profile_picture as sender_profile_picture,
+          u_sender.role as sender_role,
+          u_receiver.name as receiver_name,
+          u_receiver.profile_picture as receiver_profile_picture,
+          u_receiver.role as receiver_role
+        FROM messages m
+        JOIN users u_sender ON m.sender_id = u_sender.id
+        JOIN users u_receiver ON m.receiver_id = u_receiver.id
+        INNER JOIN (
+          SELECT 
+            GREATEST(sender_id, receiver_id) as max_id,
+            LEAST(sender_id, receiver_id) as min_id,
+            MAX(id) as latest_message_id
+          FROM messages
+          WHERE sender_id = ? OR receiver_id = ?
+          GROUP BY GREATEST(sender_id, receiver_id), LEAST(sender_id, receiver_id)
+        ) latest ON m.id = latest.latest_message_id
+        WHERE (m.sender_id = ? OR m.receiver_id = ?)
+          AND (u_sender.role = 'doctor' OR u_receiver.role = 'doctor')
+        ORDER BY m.created_at DESC
+      ''', [patientId, patientId, patientId, patientId]);
+
+      print('Found ${results.length} conversations');
+
+      return results.map((row) {
+        // Convert Blob to String if necessary
+        String messageText = row['message'] is Blob
+            ? String.fromCharCodes((row['message'] as Blob).toBytes())
+            : row['message'].toString();
+
+        // Determine if sender is doctor
+        bool isSenderDoctor = row['sender_role'] == 'doctor';
+
+        return Message.fromMap({
+          'id': row['id'],
+          'sender_id': row['sender_id'],
+          'receiver_id': row['receiver_id'],
+          'message': messageText,
+          'image': row['image'] != null ? 'assets/${row['image']}' : null,
+          'created_at': row['created_at'].toString(),
+          'updated_at': row['updated_at'].toString(),
+          'is_read': row['is_read'],
+          'sender_name': row['sender_name'],
+          'sender_profile_picture': row['sender_profile_picture'] != null
+              ? 'assets/${row['sender_profile_picture']}'
+              : 'assets/images/doctor_placeholder.png',
+          'receiver_name': row['receiver_name'],
+          'receiver_profile_picture': row['receiver_profile_picture'] != null
+              ? 'assets/${row['receiver_profile_picture']}'
+              : 'assets/images/doctor_placeholder.png',
+        });
+      }).toList();
+    } catch (e) {
+      print('Error fetching latest messages: $e');
+      print('Stack trace: ${StackTrace.current}');
+      return [];
+    }
+  }
+
+  Future<List<Message>> getMessagesBetweenUsers(
+      int userId1, int userId2) async {
+    try {
+      final conn = await connection;
+      print('Fetching messages between users $userId1 and $userId2');
+
+      final results = await conn.query('''
+        SELECT 
+          m.id,
+          m.sender_id,
+          m.receiver_id,
+          CAST(m.message AS CHAR) as message,
+          m.image,
+          m.created_at,
+          m.updated_at,
+          m.is_read,
+          sender.name as sender_name,
+          sender.profile_picture as sender_profile_picture,
+          receiver.name as receiver_name,
+          receiver.profile_picture as receiver_profile_picture
+        FROM messages m
+        JOIN users sender ON m.sender_id = sender.id
+        JOIN users receiver ON m.receiver_id = receiver.id
+        WHERE (m.sender_id = ? AND m.receiver_id = ?) 
+           OR (m.sender_id = ? AND m.receiver_id = ?)
+        ORDER BY m.created_at ASC
+      ''', [userId1, userId2, userId2, userId1]);
+
+      print('Found ${results.length} messages');
+
+      return results.map((row) {
+        // Convert Blob to String if necessary
+        String messageText = row['message'] is Blob
+            ? String.fromCharCodes((row['message'] as Blob).toBytes())
+            : row['message'].toString();
+
+        return Message.fromMap({
+          'id': row['id'],
+          'sender_id': row['sender_id'],
+          'receiver_id': row['receiver_id'],
+          'message': messageText,
+          'image': row['image'] != null ? 'assets/${row['image']}' : null,
+          'created_at': row['created_at'].toString(),
+          'updated_at': row['updated_at'].toString(),
+          'is_read': row['is_read'],
+          'sender_name': row['sender_name'],
+          'sender_profile_picture': row['sender_profile_picture'] != null
+              ? 'assets/${row['sender_profile_picture']}'
+              : 'assets/images/doctor_placeholder.png',
+          'receiver_name': row['receiver_name'],
+          'receiver_profile_picture': row['receiver_profile_picture'] != null
+              ? 'assets/${row['receiver_profile_picture']}'
+              : 'assets/images/doctor_placeholder.png',
+        });
+      }).toList();
+    } catch (e) {
+      print('Error fetching messages: $e');
+      print('Stack trace: ${StackTrace.current}');
+      return [];
+    }
+  }
+
+  Future<void> sendMessage({
+    required int senderId,
+    required int receiverId,
+    required String message,
+    String? image,
+  }) async {
+    try {
+      final conn = await connection;
+      print('Sending message from $senderId to $receiverId: $message');
+
+      final timestamp = DateTime.now().toUtc().toString();
+      await conn.query('''
+        INSERT INTO messages (
+          sender_id, 
+          receiver_id, 
+          message, 
+          image, 
+          created_at, 
+          updated_at, 
+          is_read
+        ) VALUES (?, ?, ?, ?, ?, ?, 0)
+      ''', [senderId, receiverId, message, image, timestamp, timestamp]);
+
+      print('Message sent successfully');
+    } catch (e) {
+      print('Error sending message: $e');
+      rethrow;
     }
   }
 }

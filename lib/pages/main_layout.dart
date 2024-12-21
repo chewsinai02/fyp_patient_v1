@@ -4,6 +4,7 @@ import 'chat_page.dart';
 import '../appointment_page.dart';
 import 'profile_page.dart';
 import '../services/auth_service.dart';
+import 'messages_page.dart';
 
 class MainLayout extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -23,7 +24,7 @@ class _MainLayoutState extends State<MainLayout> {
     super.initState();
     _pages = [
       DashboardContent(userData: widget.userData),
-      ChatPage(patientId: widget.userData['id']),
+      MessagesPage(patientId: widget.userData['id'] ?? 0),
       const AppointmentPage(),
       const ProfilePage(),
     ];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../services/database_service.dart';
 import 'package:intl/intl.dart';
+import '../services/auth_service.dart';
 
 class CalendarPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -54,10 +55,15 @@ class _CalendarPageState extends State<CalendarPage> {
           // Tasks List
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: DatabaseService.instance.getTasksByDate(
-                int.parse(widget.userData['id'].toString()),
-                selectedDate: _selectedDay,
-              ),
+              future: AuthService.instance.getCurrentUserId().then((userId) {
+                if (userId == null) {
+                  throw Exception('No user logged in');
+                }
+                return DatabaseService.instance.getTasksByDate(
+                  userId,
+                  selectedDate: _selectedDay,
+                );
+              }),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -72,7 +78,7 @@ class _CalendarPageState extends State<CalendarPage> {
                             size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         Text(
-                          'No tasks for ${_selectedDay.toString().split(' ')[0]}',
+                          'No tasks for ${DateFormat('yyyy-MM-dd').format(_selectedDay)}',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 16,
@@ -84,18 +90,12 @@ class _CalendarPageState extends State<CalendarPage> {
                 }
 
                 final tasks = snapshot.data!;
-                print('Selected Date: $_selectedDay');
-                print('User ID: ${widget.userData['id']}');
-                print('Tasks Data: ${snapshot.data}');
-
                 return ListView.builder(
                   itemCount: tasks.length,
                   itemBuilder: (context, index) {
                     final task = tasks[index];
                     final dueDateTime = task['due_date'] as DateTime;
                     final timeString = DateFormat('HH:mm').format(dueDateTime);
-
-                    print('Building task at index $index: $task');
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
