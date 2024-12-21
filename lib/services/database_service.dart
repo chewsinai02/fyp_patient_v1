@@ -763,20 +763,24 @@ class DatabaseService {
       }
 
       final messages = results.map((row) {
-        // Convert Blob to String if necessary
         String messageText = row['message'] is Blob
             ? String.fromCharCodes((row['message'] as Blob).toBytes())
             : row['message'].toString();
 
-        print(
-            'Processing message: ID=${row['id']}, Sender=${row['sender_id']}, Receiver=${row['receiver_id']}');
+        String? imagePath =
+            row['image'] != null ? 'assets/${row['image']}' : null;
+
+        print('Processing message:');
+        print('ID: ${row['id']}');
+        print('Sender: ${row['sender_id']}');
+        print('Image path: $imagePath');
 
         return Message.fromMap({
           'id': row['id'],
           'sender_id': row['sender_id'],
           'receiver_id': row['receiver_id'],
           'message': messageText,
-          'image': row['image'] != null ? 'assets/${row['image']}' : null,
+          'image': imagePath,
           'created_at': row['created_at'].toString(),
           'updated_at': row['updated_at'].toString(),
           'is_read': row['is_read'] ?? false,
@@ -802,18 +806,93 @@ class DatabaseService {
     }
   }
 
+  // Add this method to handle image uploads
+  Future<String?> uploadImage(File imageFile) async {
+    try {
+      // Generate a unique filename
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'chat_image_$timestamp.png';
+      final relativePath = 'chat_images/$filename';
+
+      // Use app's local path instead of current directory
+      final String appPath = 'assets'; // Change to use direct assets path
+      final String assetPath = '$appPath/$relativePath';
+
+      print('=== UPLOADING IMAGE ===');
+      print('Original file path: ${imageFile.path}');
+      print('Target path: $assetPath');
+
+      // Ensure the directory exists
+      final directory = Directory('$appPath/chat_images');
+      if (!directory.existsSync()) {
+        print('Creating directory: ${directory.path}');
+        directory.createSync(recursive: true);
+      }
+
+      // Verify source file exists
+      if (!imageFile.existsSync()) {
+        print('Error: Source image file does not exist at ${imageFile.path}');
+        return null;
+      }
+
+      // Copy the file
+      try {
+        final File newImage = await imageFile.copy(assetPath);
+
+        if (!newImage.existsSync()) {
+          print('Error: Image file was not created at $assetPath');
+          return null;
+        }
+
+        print('Image saved successfully at: $assetPath');
+        print('Relative path for database: $relativePath');
+        return relativePath;
+      } catch (e) {
+        print('Error copying file: $e');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('=== ERROR UPLOADING IMAGE ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
+  // Modify the sendMessage method to handle images
   Future<void> sendMessage({
     required int senderId,
     required int receiverId,
     required String message,
-    String? image,
+    File? imageFile,
   }) async {
     try {
       final conn = await connection;
-      print('Sending message from $senderId to $receiverId: $message');
+      String? imagePath;
+
+      if (imageFile != null) {
+        print('=== SENDING MESSAGE WITH IMAGE ===');
+        print('Image file path: ${imageFile.path}');
+        print('File exists: ${imageFile.existsSync()}');
+        print('File size: ${await imageFile.length()} bytes');
+
+        imagePath = await uploadImage(imageFile);
+        if (imagePath == null) {
+          print('Failed to upload image - imagePath is null');
+          throw Exception('Failed to upload image');
+        }
+        print('Image uploaded successfully. DB path: $imagePath');
+      }
 
       final timestamp = DateTime.now().toUtc().toString();
-      await conn.query('''
+      print('Inserting message into database:');
+      print('Sender ID: $senderId');
+      print('Receiver ID: $receiverId');
+      print('Message: $message');
+      print('Image Path: $imagePath');
+      print('Timestamp: $timestamp');
+
+      final result = await conn.query('''
         INSERT INTO messages (
           sender_id, 
           receiver_id, 
@@ -823,11 +902,13 @@ class DatabaseService {
           updated_at, 
           is_read
         ) VALUES (?, ?, ?, ?, ?, ?, 0)
-      ''', [senderId, receiverId, message, image, timestamp, timestamp]);
+      ''', [senderId, receiverId, message, imagePath, timestamp, timestamp]);
 
-      print('Message sent successfully');
-    } catch (e) {
-      print('Error sending message: $e');
+      print('Message inserted successfully. ID: ${result.insertId}');
+    } catch (e, stackTrace) {
+      print('=== ERROR SENDING MESSAGE ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
       rethrow;
     }
   }

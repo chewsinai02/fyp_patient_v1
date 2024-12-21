@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/database_service.dart';
 import '../widgets/message_input.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class ChatPage extends StatefulWidget {
   final int patientId;
@@ -20,6 +22,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   late Future<List<Message>> _messagesFuture;
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -79,6 +82,39 @@ class _ChatPageState extends State<ChatPage> {
       _scrollToBottom();
     } catch (e) {
       print('Error sending message: $e');
+    }
+  }
+
+  Future<void> _handleSendImage(File imageFile) async {
+    try {
+      print('=== HANDLING SEND IMAGE ===');
+      print('Image file path: ${imageFile.path}');
+      print('File exists: ${imageFile.existsSync()}');
+      print('File size: ${await imageFile.length()} bytes');
+
+      await DatabaseService.instance.sendMessage(
+        senderId: widget.patientId,
+        receiverId: widget.otherUserId,
+        message: '📷 Image',
+        imageFile: imageFile,
+      );
+
+      print('Message with image sent successfully');
+      setState(() {
+        _messagesFuture = _loadMessages();
+      });
+
+      await Future.delayed(const Duration(milliseconds: 100));
+      _scrollToBottom();
+    } catch (e) {
+      print('=== ERROR SENDING IMAGE ===');
+      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error sending image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -183,19 +219,11 @@ class _ChatPageState extends State<ChatPage> {
                         children: [
                           if (!isPatient) ...[
                             CircleAvatar(
-                              backgroundImage: message.senderProfilePicture !=
-                                      null
-                                  ? AssetImage(message.senderProfilePicture!)
-                                  : const AssetImage(
-                                          'assets/images/doctor_placeholder.png')
-                                      as ImageProvider,
+                              backgroundImage: AssetImage(
+                                message.senderProfilePicture ??
+                                    'assets/images/doctor_placeholder.png',
+                              ),
                               backgroundColor: Colors.deepPurple.shade100,
-                              // Remove the child Text widget to eliminate the text
-                              // child: Text(
-                              //   message.senderName?[0] ?? '?',
-                              //   style:
-                              //       const TextStyle(color: Colors.deepPurple),
-                              // ),
                             ),
                             const SizedBox(width: 8),
                           ],
@@ -213,6 +241,17 @@ class _ChatPageState extends State<ChatPage> {
                                     ? CrossAxisAlignment.end
                                     : CrossAxisAlignment.start,
                                 children: [
+                                  if (message.image != null) ...[
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.asset(
+                                        message.image!,
+                                        width: 200,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
                                   Text(
                                     message.message,
                                     style: TextStyle(
@@ -244,7 +283,10 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
-          MessageInput(onSendMessage: _handleSendMessage),
+          MessageInput(
+            onSendMessage: _handleSendMessage,
+            onSendImage: _handleSendImage,
+          ),
         ],
       ),
     );
