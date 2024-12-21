@@ -158,4 +158,142 @@ class DatabaseService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> getTasksProgress(int patientId) async {
+    try {
+      final conn = await connection;
+      print('Getting tasks progress for patient ID: $patientId');
+
+      // Get pending tasks count for today
+      final pendingResult = await conn.query('''
+        SELECT COUNT(*) as pending 
+        FROM tasks 
+        WHERE patient_id = ? 
+        AND DATE(due_date) = CURDATE() 
+        AND status = "pending"
+        ''', [patientId]);
+
+      // Get completed tasks count for today
+      final completedResult = await conn.query('''
+        SELECT COUNT(*) as completed 
+        FROM tasks 
+        WHERE patient_id = ? 
+        AND DATE(due_date) = CURDATE() 
+        AND status = "completed"
+        ''', [patientId]);
+
+      // Get passed tasks count for today
+      final passedResult = await conn.query('''
+        SELECT COUNT(*) as passed 
+        FROM tasks 
+        WHERE patient_id = ? 
+        AND DATE(due_date) = CURDATE() 
+        AND status = "passed"
+        ''', [patientId]);
+
+      print('Query results:');
+      print('Pending tasks: ${pendingResult.first}');
+      print('Completed tasks: ${completedResult.first}');
+      print('Passed tasks: ${passedResult.first}');
+
+      final pending = pendingResult.first['pending'] as int;
+      final completed = completedResult.first['completed'] as int;
+      final passed = passedResult.first['passed'] as int;
+
+      final total = pending + completed + passed;
+
+      print('Calculated progress:');
+      print('Pending tasks: $pending');
+      print('Completed tasks: $completed');
+      print('Passed tasks: $passed');
+      print('Total tasks: $total');
+      print('Progress ratio: ${total > 0 ? completed / total : 0.0}');
+
+      return {
+        'total': total,
+        'completed': completed,
+        'pending': pending,
+        'passed': passed,
+        'progress': total > 0 ? completed / total : 0.0,
+      };
+    } catch (e, stackTrace) {
+      print('Error getting tasks progress:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return {
+        'total': 0,
+        'completed': 0,
+        'pending': 0,
+        'passed': 0,
+        'progress': 0.0,
+      };
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTasksByDate(
+    int patientId, {
+    DateTime? selectedDate,
+  }) async {
+    try {
+      final conn = await connection;
+      print('=== FETCHING TASKS START ===');
+      print('Patient ID: $patientId');
+
+      // Use selected date or default to today
+      final date = selectedDate ?? DateTime.now();
+      final formattedDate =
+          "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+
+      print('Formatted Date for Query: $formattedDate');
+
+      final query = '''
+        SELECT 
+          id, 
+          title, 
+          description, 
+          status, 
+          priority,
+          due_date,
+          room_id
+        FROM tasks 
+        WHERE patient_id = ? 
+        AND DATE(due_date) = ?
+        AND deleted_at IS NULL
+        ORDER BY due_date ASC
+      ''';
+
+      print('Executing Query:');
+      print(query);
+      print('Parameters: [$patientId, $formattedDate]');
+
+      final results = await conn.query(query, [patientId, formattedDate]);
+
+      print('Raw Results Count: ${results.length}');
+
+      List<Map<String, dynamic>> tasks = [];
+
+      for (var row in results) {
+        final task = {
+          'id': row['id'],
+          'room_id': row['room_id'],
+          'title': row['title'],
+          'description': row['description'],
+          'status': row['status'],
+          'priority': row['priority'],
+          'due_date': row['due_date'],
+        };
+        print('Processed Task: $task');
+        tasks.add(task);
+      }
+
+      print('Total Tasks Found: ${tasks.length}');
+      print('=== FETCHING TASKS END ===');
+      return tasks;
+    } catch (e, stackTrace) {
+      print('=== ERROR FETCHING TASKS ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return [];
+    }
+  }
 }

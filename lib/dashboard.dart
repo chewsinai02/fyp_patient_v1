@@ -6,6 +6,7 @@ import 'function_page.dart';
 import 'pages/chat_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/daily_tasks_page.dart';
+import 'services/database_service.dart';
 
 class DashboardPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -159,63 +160,96 @@ class DashboardContent extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const DailyTasksPage(),
-                    ),
-                  );
-                },
-                child: Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: DatabaseService.instance
+                    .getTasksProgress(int.parse(userData['id'].toString())),
+                builder: (context, snapshot) {
+                  print('FutureBuilder state:');
+                  print('Has data: ${snapshot.hasData}');
+                  print('Has error: ${snapshot.hasError}');
+                  if (snapshot.hasError) {
+                    print('Error: ${snapshot.error}');
+                  }
+
+                  double progress = 0.0;
+                  int total = 0;
+                  int completed = 0;
+                  int pending = 0;
+                  int passed = 0;
+
+                  if (snapshot.hasData) {
+                    progress = snapshot.data!['progress'];
+                    total = snapshot.data!['total'];
+                    completed = snapshot.data!['completed'];
+                    pending = snapshot.data!['pending'];
+                    passed = snapshot.data!['passed'];
+                    print('Dashboard received data:');
+                    print('Progress: $progress');
+                    print('Total: $total');
+                    print('Completed: $completed');
+                    print('Pending: $pending');
+                    print('Passed: $passed');
+                  }
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DailyTasksPage(),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Today\'s Tasks',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Today\'s Tasks',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ],
                             ),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: Colors.grey[600],
+                            const SizedBox(height: 16),
+                            LinearProgressIndicator(
+                              value: progress,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.deepPurple),
+                              minHeight: 10,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Completed $completed of $total tasks',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        LinearProgressIndicator(
-                          value: 0.75,
-                          backgroundColor: Colors.grey[200],
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.deepPurple),
-                          minHeight: 10,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'View your daily tasks',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
