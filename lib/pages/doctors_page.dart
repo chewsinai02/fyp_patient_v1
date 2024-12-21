@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
+import '../pages/booking_page.dart';
+import '../services/auth_service.dart';
 
 class DoctorsPage extends StatefulWidget {
   const DoctorsPage({super.key});
@@ -22,6 +24,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
   Future<void> _loadDoctors() async {
     try {
       final doctors = await _db.getDoctors();
+      print('Doctors loaded: ${doctors.length}'); // Debugging print statement
       setState(() {
         _doctors = doctors;
         _isLoading = false;
@@ -52,10 +55,10 @@ class _DoctorsPageState extends State<DoctorsPage> {
                         final doctor = _doctors[index];
                         return _buildDoctorCard(
                           name: doctor['name'],
-                          specialty: doctor['specialty'],
-                          experience: doctor['experience'],
-                          rating: doctor['rating'],
-                          isAvailable: doctor['isAvailable'],
+                          specialty: doctor['specialty'] ?? 'N/A',
+                          experience: doctor['experience'] ?? 'N/A',
+                          rating: doctor['rating'] ?? 0.0,
+                          doctorId: doctor['id'],
                         );
                       },
                     ),
@@ -116,7 +119,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
     required String specialty,
     required String experience,
     required double rating,
-    required bool isAvailable,
+    required int doctorId,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
@@ -200,15 +203,13 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: isAvailable
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.grey[100],
+                  color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  isAvailable ? 'Available' : 'Unavailable',
+                  'Available',
                   style: TextStyle(
-                    color: isAvailable ? Colors.green : Colors.grey,
+                    color: Colors.green,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -216,7 +217,27 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ),
               const SizedBox(height: 8),
               ElevatedButton(
-                onPressed: isAvailable ? () {} : null,
+                onPressed: () async {
+                  try {
+                    final int? userId =
+                        await AuthService.instance.getCurrentUserId();
+                    if (userId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookingPage(
+                            doctorName: name,
+                            doctorId: doctorId,
+                          ),
+                        ),
+                      );
+                    } else {
+                      print('User ID not found');
+                    }
+                  } catch (e) {
+                    print('Error retrieving user ID: $e');
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                   shape: RoundedRectangleBorder(

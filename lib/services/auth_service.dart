@@ -2,6 +2,16 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class AuthService {
+  static final AuthService _instance = AuthService._internal();
+
+  factory AuthService() {
+    return _instance;
+  }
+
+  AuthService._internal();
+
+  static AuthService get instance => _instance;
+
   static const String baseUrl = 'your_laravel_api_url';
 
   Future<Map<String, dynamic>?> login(String email, String password) async {
@@ -25,5 +35,9 @@ class AuthService {
       print('Login error: $e');
       return null;
     }
+  }
+
+  int getCurrentUserId() {
+    return 1;
   }
 }

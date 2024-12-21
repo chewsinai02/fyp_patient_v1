@@ -95,72 +95,24 @@ class _CalendarPageState extends State<CalendarPage> {
                     final dueDateTime = task['due_date'] as DateTime;
                     final timeString = DateFormat('HH:mm').format(dueDateTime);
 
+                    print('Building task at index $index: $task');
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      elevation: 2,
                       child: ListTile(
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _getStatusColor(task['status']),
-                          ),
-                          child: Icon(
-                            _getStatusIcon(task['status']),
-                            color: Colors.white,
-                          ),
+                        leading: Icon(
+                          task['status'] == 'completed'
+                              ? Icons.check_circle
+                              : Icons.access_time,
+                          color: task['status'] == 'completed'
+                              ? Colors.green
+                              : Colors.grey,
                         ),
-                        title: Text(
-                          task['title']?.toString() ?? 'Untitled Task',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  size: 16,
-                                  color: Colors.grey[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  timeString,
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Icon(
-                                  _getPriorityIcon(task['priority']),
-                                  size: 16,
-                                  color: _getPriorityColor(task['priority']),
-                                ),
-                              ],
-                            ),
-                            if (task['description'] != null &&
-                                task['description'].toString().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  task['description'].toString(),
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                        ),
+                        title: Text(task['title']),
+                        subtitle: Text(timeString),
                       ),
                     );
                   },

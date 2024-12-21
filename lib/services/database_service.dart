@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -76,38 +78,6 @@ class DatabaseService {
     _conn = null;
   }
 
-  // Example method to fetch doctors
-  Future<List<Map<String, dynamic>>> getDoctors() async {
-    final conn = await connection;
-    final results = await conn.query('SELECT * FROM doctors');
-
-    return results
-        .map((row) => {
-              'id': row['id'],
-              'name': row['name'],
-              'specialty': row['specialty'],
-              'experience': row['experience'],
-              'rating': row['rating'],
-              'isAvailable': row['is_available'] == 1,
-            })
-        .toList();
-  }
-
-  // Example method to add a doctor
-  Future<void> addDoctor({
-    required String name,
-    required String specialty,
-    required String experience,
-    required double rating,
-    required bool isAvailable,
-  }) async {
-    final conn = await connection;
-    await conn.query(
-      'INSERT INTO doctors (name, specialty, experience, rating, is_available) VALUES (?, ?, ?, ?, ?)',
-      [name, specialty, experience, rating, isAvailable ? 1 : 0],
-    );
-  }
-
   // Update authentication method to handle bcrypt passwords
   Future<Map<String, dynamic>?> authenticateUser(
       String email, String password) async {
@@ -159,6 +129,7 @@ class DatabaseService {
     }
   }
 
+  //dashboard count task
   Future<Map<String, dynamic>> getTasksProgress(int patientId) async {
     try {
       final conn = await connection;
@@ -230,6 +201,7 @@ class DatabaseService {
     }
   }
 
+  //calendar page
   Future<List<Map<String, dynamic>>> getTasksByDate(
     int patientId, {
     DateTime? selectedDate,
@@ -259,7 +231,7 @@ class DatabaseService {
         WHERE patient_id = ? 
         AND DATE(due_date) = ?
         AND deleted_at IS NULL
-        ORDER BY due_date ASC
+        ORDER BY TIME(due_date) ASC
       ''';
 
       print('Executing Query:');
@@ -273,6 +245,14 @@ class DatabaseService {
       List<Map<String, dynamic>> tasks = [];
 
       for (var row in results) {
+        // Ensure due_date is properly converted to DateTime
+        DateTime? dueDate;
+        if (row['due_date'] != null) {
+          dueDate = row['due_date'] is DateTime
+              ? row['due_date']
+              : DateTime.parse(row['due_date'].toString());
+        }
+
         final task = {
           'id': row['id'],
           'room_id': row['room_id'],
@@ -280,7 +260,7 @@ class DatabaseService {
           'description': row['description'],
           'status': row['status'],
           'priority': row['priority'],
-          'due_date': row['due_date'],
+          'due_date': dueDate,
         };
         print('Processed Task: $task');
         tasks.add(task);
@@ -294,6 +274,121 @@ class DatabaseService {
       print('Error: $e');
       print('Stack trace: $stackTrace');
       return [];
+    }
+  }
+
+  // Example method to fetch doctors
+  Future<List<Map<String, dynamic>>> getDoctors() async {
+    try {
+      print('=== FETCHING DOCTORS START ===');
+      final conn = await connection;
+
+      final query = '''
+        SELECT 
+          id,
+          name,
+          description,
+          staff_id as experience,
+          CAST(5.0 AS DECIMAL(3,1)) as rating
+        FROM users 
+        WHERE LOWER(role) = 'doctor'
+      ''';
+
+      print('Executing query: $query');
+      final results = await conn.query(query);
+      print('Raw results from database: ${results.length}');
+
+      List<Map<String, dynamic>> doctors = [];
+      for (var row in results) {
+        String specialty = 'General Practice';
+        try {
+          if (row['description'] != null) {
+            if (row['description'] is Blob) {
+              final blob = row['description'] as Blob;
+              specialty = String.fromCharCodes(blob.toString().codeUnits);
+            } else {
+              specialty = row['description'].toString();
+            }
+          }
+        } catch (e) {
+          print('Error converting description to string: $e');
+          specialty = 'General Practice';
+        }
+
+        final doctor = {
+          'id': row['id'],
+          'name': row['name'],
+          'specialty': specialty,
+          'experience': row['experience']?.toString() ?? 'N/A',
+          'rating': row['rating'] ?? 5.0,
+        };
+        print('Processing doctor: $doctor');
+        doctors.add(doctor);
+      }
+
+      print('=== FETCHING DOCTORS END ===');
+      print('Total doctors processed: ${doctors.length}');
+      return doctors;
+    } catch (e, stackTrace) {
+      print('=== ERROR FETCHING DOCTORS ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  // Example method to add a doctor
+  Future<void> addDoctor({
+    required String name,
+    required String specialty,
+    required String experience,
+    required double rating,
+  }) async {
+    final conn = await connection;
+    await conn.query(
+      'INSERT INTO doctors (name, specialty, experience, rating) VALUES (?, ?, ?, ?)',
+      [name, specialty, experience, rating],
+    );
+  }
+
+  //booking page
+  Future<void> addAppointment({
+    required int patientId,
+    required int doctorId,
+    required DateTime appointmentDate,
+    required TimeOfDay appointmentTime,
+    String? notes,
+  }) async {
+    try {
+      final conn = await connection;
+      final query = '''
+        INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, notes)
+        VALUES (?, ?, ?, ?, 'active', ?)
+      ''';
+
+      // Convert TimeOfDay to a string format
+      String formattedTime =
+          '${appointmentTime.hour.toString().padLeft(2, '0')}:${appointmentTime.minute.toString().padLeft(2, '0')}';
+
+      // Log the values being inserted
+      print('Inserting appointment for Patient ID: $patientId');
+      print('Doctor ID: $doctorId');
+      print(
+          'Appointment Date: ${appointmentDate.toIso8601String().split('T')[0]}');
+      print('Appointment Time: $formattedTime');
+      print('Notes: $notes');
+
+      await conn.query(query, [
+        patientId,
+        doctorId,
+        appointmentDate.toIso8601String().split('T')[0], // Convert to date
+        formattedTime, // Use formatted time
+        notes,
+      ]);
+
+      print('Appointment added successfully.');
+    } catch (e) {
+      print('Error adding appointment: $e');
     }
   }
 }

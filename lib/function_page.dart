@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'nurse_calling_page.dart';
 import 'pages/daily_tasks_page.dart';
-import 'pages/medications_page.dart';
+// import 'pages/medications_page.dart'; // Commented out
 import 'pages/chat_page.dart';
 import 'pages/reports_page.dart';
-import 'pages/vitals_page.dart';
+// import 'pages/vitals_page.dart'; // Commented out
 import 'pages/profile_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/doctors_page.dart';
@@ -150,19 +150,6 @@ class FunctionPage extends StatelessWidget {
           children: [
             Expanded(
               child: _buildFunctionCard(
-                title: 'Medications',
-                icon: Icons.medication_outlined,
-                color: Colors.purple,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const MedicationsPage()),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildFunctionCard(
                 title: 'Chat',
                 icon: Icons.chat_bubble_outline,
                 color: Colors.green,
@@ -174,11 +161,7 @@ class FunctionPage extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
+            const SizedBox(width: 16),
             Expanded(
               child: _buildFunctionCard(
                 title: 'Reports',
@@ -188,20 +171,6 @@ class FunctionPage extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ReportsPage(),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildFunctionCard(
-                title: 'Vitals',
-                icon: Icons.favorite_outline,
-                color: Colors.pink,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const VitalsPage(),
                   ),
                 ),
               ),
