@@ -42,14 +42,25 @@ class _BookingPageState extends State<BookingPage> {
 
   // Add this method to fetch available slots
   Future<void> _fetchAvailableSlots(DateTime date) async {
-    final slots = await _db.getAvailableTimeSlots(widget.doctorId, date);
+    print('Fetching available slots for date: ${date.toIso8601String()}');
+
+    // Clear existing slots for this date
     setState(() {
-      _availableSlots[date] = slots;
-      // Clear selected time if it's no longer available
-      if (_selectedTime != null && !slots.contains(_selectedTime)) {
-        _selectedTime = null;
-      }
+      _availableSlots.remove(date);
     });
+
+    final slots = await _db.getAvailableTimeSlots(widget.doctorId, date);
+
+    print('Received slots for ${date.toIso8601String()}: $slots');
+
+    if (mounted) {
+      setState(() {
+        _availableSlots[date] = slots;
+      });
+    }
+
+    print(
+        'Updated available slots for ${date.toIso8601String()}: ${_availableSlots[date]}');
   }
 
   // Update the TableCalendar's calendarBuilders
@@ -79,9 +90,13 @@ class _BookingPageState extends State<BookingPage> {
   // Update the onDaySelected callback
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) async {
     if (selectedDay.weekday != DateTime.sunday) {
-      if (!_availableSlots.containsKey(selectedDay)) {
-        await _fetchAvailableSlots(selectedDay);
-      }
+      // Clear previous selection
+      setState(() {
+        _selectedTime = null;
+      });
+
+      // Fetch available slots for the selected date
+      await _fetchAvailableSlots(selectedDay);
 
       if (_availableSlots[selectedDay]?.isNotEmpty ?? false) {
         setState(() {
@@ -104,6 +119,8 @@ class _BookingPageState extends State<BookingPage> {
     }
 
     final availableSlots = _availableSlots[_selectedDate] ?? [];
+    print('Building dropdown with available slots: $availableSlots');
+
     if (availableSlots.isEmpty) {
       return const Text('No available slots for selected date');
     }
@@ -112,6 +129,7 @@ class _BookingPageState extends State<BookingPage> {
       hint: const Text('Select Appointment Time'),
       value: _selectedTime,
       onChanged: (String? newValue) {
+        print('Selected new time: $newValue');
         setState(() {
           _selectedTime = newValue;
         });

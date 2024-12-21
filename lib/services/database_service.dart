@@ -395,23 +395,34 @@ class DatabaseService {
     try {
       final conn = await connection;
 
+      // Format the date to match MySQL date format
+      final formattedDate = date.toIso8601String().split('T')[0];
+
       // Get all booked appointments for the specified doctor and date
       final query = '''
-        SELECT appointment_time 
+        SELECT TIME_FORMAT(appointment_time, '%H:%i:%s') as appointment_time 
         FROM appointments 
         WHERE doctor_id = ? 
-        AND appointment_date = ?
+        AND DATE(appointment_date) = ?
         AND status = 'active'
       ''';
 
-      final results = await conn
-          .query(query, [doctorId, date.toIso8601String().split('T')[0]]);
+      print('Checking appointments for:');
+      print('Doctor ID: $doctorId');
+      print('Date: $formattedDate');
+
+      final results = await conn.query(query, [doctorId, formattedDate]);
 
       // Convert results to a list of booked times
       List<String> bookedTimes =
           results.map((row) => row['appointment_time'].toString()).toList();
 
-      // Define all possible time slots (same as in BookingPage's appointmentTimeMap)
+      print('=== AVAILABLE TIME SLOTS ===');
+      print('Checking date: $formattedDate');
+      print('Doctor ID: $doctorId');
+      print('Already booked times: $bookedTimes');
+
+      // Define all possible time slots
       final allTimeSlots = [
         '09:00:00',
         '09:30:00',
@@ -427,10 +438,20 @@ class DatabaseService {
         '16:30:00'
       ];
 
-      // Return available time slots (those not in bookedTimes)
-      return allTimeSlots.where((time) => !bookedTimes.contains(time)).toList();
+      // Get available slots by filtering out booked times
+      final availableSlots = allTimeSlots
+          .where((timeSlot) => !bookedTimes.any((bookedTime) {
+                return timeSlot.trim() == bookedTime.trim();
+              }))
+          .toList();
+
+      print('Available slots for $formattedDate: $availableSlots');
+      print('=========================');
+
+      return availableSlots;
     } catch (e) {
       print('Error getting available time slots: $e');
+      print('Stack trace: ${StackTrace.current}');
       return [];
     }
   }

@@ -106,7 +106,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Find the best doctors in your area',
+            'Meet our experienced doctors and book your appointments!',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 14,
