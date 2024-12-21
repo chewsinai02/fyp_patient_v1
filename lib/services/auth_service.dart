@@ -3,32 +3,23 @@ import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
 
 class AuthService {
-  static final AuthService _instance = AuthService._internal();
+  static AuthService? _instance;
   Map<String, dynamic>? _currentUser;
 
-  factory AuthService() {
-    return _instance;
+  static AuthService get instance {
+    _instance ??= AuthService._();
+    return _instance!;
   }
 
-  AuthService._internal();
+  AuthService._();
 
-  static AuthService get instance => _instance;
-
-  static const String baseUrl = 'your_laravel_api_url';
+  Map<String, dynamic>? get currentUser => _currentUser;
 
   void setCurrentUser(Map<String, dynamic> userData) {
-    print('Setting current user: $userData');
     _currentUser = userData;
-    print('Current user after setting: $_currentUser');
   }
 
-  Map<String, dynamic>? getCurrentUser() {
-    print('Getting current user: $_currentUser');
-    if (_currentUser == null) {
-      print('WARNING: No user is currently logged in!');
-    }
-    return _currentUser;
-  }
+  static const String baseUrl = 'your_laravel_api_url';
 
   Future<int?> getCurrentUserId() async {
     return _currentUser?['id'];
@@ -48,7 +39,7 @@ class AuthService {
       print('Login successful, setting user data');
       setCurrentUser(mockUserData);
 
-      final currentUser = getCurrentUser();
+      final currentUser = getCurrentUserId();
       print('Verifying current user after login: $currentUser');
 
       return mockUserData;

@@ -23,7 +23,7 @@ class _MainLayoutState extends State<MainLayout> {
     super.initState();
     _pages = [
       DashboardContent(userData: widget.userData),
-      const ChatPage(),
+      ChatPage(patientId: widget.userData['id']),
       const AppointmentPage(),
       const ProfilePage(),
     ];

@@ -8,6 +8,7 @@ import 'pages/reports_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/doctors_page.dart';
+import 'services/auth_service.dart';
 
 class FunctionPage extends StatelessWidget {
   const FunctionPage({super.key});
@@ -156,7 +157,9 @@ class FunctionPage extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ChatPage(),
+                    builder: (context) => ChatPage(
+                      patientId: AuthService.instance.currentUser?['id'] ?? 0,
+                    ),
                   ),
                 ),
               ),

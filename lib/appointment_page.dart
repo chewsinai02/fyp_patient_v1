@@ -1,7 +1,44 @@
 import 'package:flutter/material.dart';
+import 'services/database_service.dart';
+import 'services/auth_service.dart';
+import 'package:intl/intl.dart';
+import 'pages/doctors_page.dart'; // Adjust the path as necessary
 
-class AppointmentPage extends StatelessWidget {
+class AppointmentPage extends StatefulWidget {
   const AppointmentPage({super.key});
+
+  @override
+  State<AppointmentPage> createState() => _AppointmentPageState();
+}
+
+class _AppointmentPageState extends State<AppointmentPage> {
+  List<Map<String, dynamic>> _appointments = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppointments();
+  }
+
+  Future<void> _loadAppointments() async {
+    try {
+      final userId = await AuthService.instance.getCurrentUserId();
+      if (userId != null) {
+        final appointments =
+            await DatabaseService.instance.getAppointments(userId);
+        setState(() {
+          _appointments = appointments;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading appointments: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +54,6 @@ class AppointmentPage extends StatelessWidget {
                 children: [
                   _buildUpcomingAppointments(),
                   const SizedBox(height: 24),
-                  _buildAvailableSlots(),
                 ],
               ),
             ),
@@ -26,11 +62,14 @@ class AppointmentPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // Handle new appointment
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => DoctorsPage()), // Navigate to DoctorPage
+          );
         },
         backgroundColor: Colors.deepPurple,
-        icon: const Icon(Icons.add),
-        label: const Text('Book Appointment'),
+        label: const Text('+', style: TextStyle(color: Colors.white)),
       ),
     );
   }
@@ -80,54 +119,26 @@ class AppointmentPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Upcoming Appointments',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
         const SizedBox(height: 16),
-        _buildAppointmentCard(
-          doctorName: 'Dr. Sarah Johnson',
-          specialty: 'Cardiologist',
-          date: 'Today, 2:30 PM',
-          isUpcoming: true,
-        ),
-        _buildAppointmentCard(
-          doctorName: 'Dr. Michael Chen',
-          specialty: 'Neurologist',
-          date: 'Tomorrow, 10:00 AM',
-          isUpcoming: true,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAvailableSlots() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Available Time Slots',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildTimeSlot('09:00 AM'),
-            _buildTimeSlot('10:30 AM'),
-            _buildTimeSlot('11:30 AM'),
-            _buildTimeSlot('02:00 PM'),
-            _buildTimeSlot('03:30 PM'),
-            _buildTimeSlot('04:30 PM'),
-          ],
-        ),
+        if (_isLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (_appointments.isEmpty)
+          const Center(
+            child: Text('No upcoming appointments'),
+          )
+        else
+          ..._appointments.map((appointment) => _buildAppointmentCard(
+                doctorName: appointment['doctor_name'],
+                specialty: appointment['notes'] is String
+                    ? appointment['notes']
+                    : appointment['notes'].toString(),
+                date: _formatDateTime(
+                  appointment['appointment_date'],
+                  appointment['appointment_time'],
+                ),
+                isUpcoming: true,
+                doctorId: appointment['doctor_id'],
+              )),
       ],
     );
   }
@@ -137,7 +148,15 @@ class AppointmentPage extends StatelessWidget {
     required String specialty,
     required String date,
     required bool isUpcoming,
+    required dynamic doctorId,
   }) {
+    final appointment = _appointments.firstWhere(
+      (a) => a['doctor_id'] == doctorId,
+      orElse: () => {},
+    );
+
+    final profilePicture = 'assets${appointment['profile_picture']}';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -161,10 +180,23 @@ class AppointmentPage extends StatelessWidget {
               color: Colors.deepPurple.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.medical_services_outlined,
-              color: Colors.deepPurple,
-              size: 30,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                profilePicture,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading image: $error');
+                  print('Attempted path: $profilePicture');
+                  return const Icon(
+                    Icons.person,
+                    color: Colors.deepPurple,
+                    size: 30,
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -197,10 +229,6 @@ class AppointmentPage extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {},
-          ),
         ],
       ),
     );
@@ -224,5 +252,20 @@ class AppointmentPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDateTime(dynamic date, dynamic time) {
+    // Convert date and time to String if they are not already
+    String dateString = date is String ? date : date.toString();
+    String timeString = time is String ? time : time.toString();
+
+    // Parse the date and time
+    DateTime parsedDate =
+        DateTime.parse(dateString); // Assuming date is in 'yyyy-mm-dd' format
+    String formattedTime = DateFormat.jm().format(
+        DateFormat.Hm().parse(timeString)); // Format time to 'hh:mm am/pm'
+
+    // Return formatted date and time
+    return '${parsedDate.toIso8601String().split('T')[0]}, $formattedTime'; // Format date to 'yyyy-mm-dd'
   }
 }

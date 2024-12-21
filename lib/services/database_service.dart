@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../models/message.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -289,7 +290,8 @@ class DatabaseService {
           name,
           description,
           staff_id as experience,
-          CAST(5.0 AS DECIMAL(3,1)) as rating
+          CAST(5.0 AS DECIMAL(3,1)) as rating,
+          COALESCE(profile_picture, '/images/default_avatar.png') as profile_picture
         FROM users 
         WHERE LOWER(role) = 'doctor'
       ''';
@@ -315,12 +317,20 @@ class DatabaseService {
           specialty = 'General Practice';
         }
 
+        // Process profile picture path
+        String profilePicture =
+            row['profile_picture'] ?? '/images/default_avatar.png';
+        if (!profilePicture.startsWith('/')) {
+          profilePicture = '/${profilePicture}';
+        }
+
         final doctor = {
           'id': row['id'],
           'name': row['name'],
           'specialty': specialty,
           'experience': row['experience']?.toString() ?? 'N/A',
           'rating': row['rating'] ?? 5.0,
+          'profile_picture': profilePicture,
         };
         print('Processing doctor: $doctor');
         doctors.add(doctor);
@@ -452,6 +462,145 @@ class DatabaseService {
     } catch (e) {
       print('Error getting available time slots: $e');
       print('Stack trace: ${StackTrace.current}');
+      return [];
+    }
+  }
+
+  //chat page
+  Future<List<Message>> getMessages(int patientId) async {
+    try {
+      final conn = await connection;
+      print('Fetching messages for patient ID: $patientId');
+
+      final results = await conn.query('''
+        SELECT 
+          m.*,
+          u_sender.name as sender_name,
+          u_sender.profile_picture as sender_profile_picture,
+          u_receiver.name as receiver_name,
+          u_receiver.profile_picture as receiver_profile_picture
+        FROM messages m
+        JOIN users u_sender ON m.sender_id = u_sender.id
+        JOIN users u_receiver ON m.receiver_id = u_receiver.id
+        WHERE m.sender_id = ? OR m.receiver_id = ?
+        ORDER BY m.created_at DESC
+      ''', [patientId, patientId]);
+
+      print('Query executed. Raw results:');
+      if (results.isEmpty) {
+        print('No messages found for patient ID: $patientId');
+      } else {
+        for (var row in results) {
+          print('Message ID: ${row['id']}');
+          print('Sender ID: ${row['sender_id']}');
+          print('Sender Name: ${row['sender_name']}');
+          print('Sender Profile Picture: ${row['sender_profile_picture']}');
+          print('Receiver ID: ${row['receiver_id']}');
+          print('Receiver Name: ${row['receiver_name']}');
+          print('Receiver Profile Picture: ${row['receiver_profile_picture']}');
+          print('Message: ${row['message']}');
+          print('-------------------');
+        }
+      }
+
+      final messages = results
+          .map((row) => Message.fromMap({
+                ...row.fields,
+                'sender_name': row['sender_name'],
+                'sender_profile_picture': row['sender_profile_picture'],
+                'receiver_name': row['receiver_name'],
+                'receiver_profile_picture': row['receiver_profile_picture'],
+              }))
+          .toList();
+
+      print('Converted to ${messages.length} Message objects');
+      return messages;
+    } catch (e, stackTrace) {
+      print('Error fetching messages: $e');
+      print('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  // Add this method to DatabaseService class
+  Future<List<Map<String, dynamic>>> getAppointments(int patientId) async {
+    try {
+      final conn = await connection;
+      print('Fetching appointments for patient ID: $patientId');
+
+      // First, get the doctor's profile picture
+      final doctorQuery = '''
+        SELECT 
+          d.id as doctor_id,
+          d.profile_picture
+        FROM users d
+        WHERE d.role = 'doctor'
+      ''';
+
+      final doctorResults = await conn.query(doctorQuery);
+      Map<int, String> doctorProfiles = {};
+
+      for (var row in doctorResults) {
+        doctorProfiles[row['doctor_id']] =
+            row['profile_picture'] ?? '/images/default_avatar.png';
+      }
+
+      // Then get the appointments
+      final query = '''
+        SELECT 
+          a.id,
+          a.appointment_date,
+          a.appointment_time,
+          a.status,
+          a.notes,
+          u.id as doctor_id,
+          u.name as doctor_name,
+          u.description as specialty
+        FROM appointments a
+        INNER JOIN users u ON a.doctor_id = u.id
+        WHERE a.patient_id = ?
+        AND a.status = 'active'
+        ORDER BY a.appointment_date ASC, a.appointment_time ASC
+      ''';
+
+      print('Executing appointments query with patient ID: $patientId');
+      final results = await conn.query(query, [patientId]);
+      print('Found ${results.length} appointments');
+
+      List<Map<String, dynamic>> appointments = [];
+      for (var row in results) {
+        final doctorId = row['doctor_id'];
+        String profilePicture =
+            doctorProfiles[doctorId] ?? '/images/default_avatar.png';
+
+        // Ensure profile picture starts with a forward slash
+        if (!profilePicture.startsWith('/')) {
+          profilePicture = '/${profilePicture}';
+        }
+
+        print(
+            'Processing appointment: ${row['id']} for doctor: ${row['doctor_name']}');
+        print('Doctor ID: $doctorId');
+        print('Profile picture path: $profilePicture');
+
+        appointments.add({
+          'id': row['id'],
+          'doctor_id': doctorId,
+          'doctor_name': row['doctor_name'] ?? 'Unknown Doctor',
+          'specialty': row['specialty'] ?? 'General Practice',
+          'appointment_date': row['appointment_date'],
+          'appointment_time': row['appointment_time'],
+          'notes': row['notes'],
+          'profile_picture': profilePicture,
+          'status': row['status'],
+        });
+      }
+
+      print('Processed ${appointments.length} appointments successfully');
+      return appointments;
+    } catch (e, stackTrace) {
+      print('Error fetching appointments: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }

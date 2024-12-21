@@ -192,7 +192,7 @@ class _LoginPageState extends State<LoginPage> {
 
       // Set the user data in AuthService after successful authentication
       AuthService.instance.setCurrentUser(user);
-      final currentUser = AuthService.instance.getCurrentUser();
+      final currentUser = AuthService.instance.getCurrentUserId();
       print('Verified login - Current user: $currentUser');
 
       print('Authentication successful - navigating to dashboard');

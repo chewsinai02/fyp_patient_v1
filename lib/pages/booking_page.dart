@@ -147,8 +147,13 @@ class _BookingPageState extends State<BookingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Book Appointment'),
+        title: const Text('Book Appointment',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.deepPurple,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -176,7 +181,7 @@ class _BookingPageState extends State<BookingPage> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Please select appointment time and below:',
+                        'Please select appointment time and date:',
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     ],
@@ -291,7 +296,7 @@ class _BookingPageState extends State<BookingPage> {
                   ),
                   child: const Text(
                     'Confirm Booking',
-                    style: TextStyle(fontSize: 18),
+                    style: TextStyle(fontSize: 18, color: Colors.white),
                   ),
                 ),
               ),

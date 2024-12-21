@@ -21,7 +21,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
     super.initState();
     _loadDoctors();
     print(
-        'DoctorsPage initialized - Current user: ${AuthService.instance.getCurrentUser()}');
+        'DoctorsPage initialized - Current user: ${AuthService.instance.getCurrentUserId()}');
   }
 
   Future<void> _loadDoctors() async {
@@ -60,7 +60,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                           name: doctor['name'],
                           specialty: doctor['specialty'] ?? 'N/A',
                           experience: doctor['experience'] ?? 'N/A',
-                          rating: doctor['rating'] ?? 0.0,
+                          rating: doctor['rating']?.toDouble() ?? 0.0,
                           doctorId: doctor['id'],
                         );
                       },
@@ -124,6 +124,14 @@ class _DoctorsPageState extends State<DoctorsPage> {
     required double rating,
     required int doctorId,
   }) {
+    // Find the doctor data to get the profile picture
+    final doctor = _doctors.firstWhere(
+      (d) => d['id'] == doctorId,
+      orElse: () => {},
+    );
+
+    final profilePicture = 'assets${doctor['profile_picture']}';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
@@ -147,10 +155,23 @@ class _DoctorsPageState extends State<DoctorsPage> {
               color: Colors.deepPurple.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.person,
-              size: 40,
-              color: Colors.deepPurple,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                profilePicture,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading image: $error');
+                  print('Attempted path: $profilePicture');
+                  return const Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Colors.deepPurple,
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(width: 15),
@@ -222,7 +243,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
               ElevatedButton(
                 onPressed: () async {
                   print('Book button pressed'); // Debug print
-                  final currentUser = AuthService.instance.getCurrentUser();
+                  final currentUser = AuthService.instance.getCurrentUserId();
                   print(
                       'Current user when booking: $currentUser'); // Debug print
 
@@ -262,7 +283,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                               ).then((_) {
                                 // Check login state after returning from login page
                                 final user =
-                                    AuthService.instance.getCurrentUser();
+                                    AuthService.instance.getCurrentUserId();
                                 print(
                                     'Returned from login page, current user: $user');
                               });
