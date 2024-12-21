@@ -945,6 +945,8 @@ class DatabaseService {
           r.respiratory_rate,
           r.lab_results,
           r.status,
+          r.height,
+          r.weight,
           p.name as patient_name,
           p.gender,
           p.contact_number,
@@ -967,6 +969,8 @@ class DatabaseService {
       final row = results.first;
       print('\nProcessing row data:');
       print('Report ID: ${row['id']}');
+      print('Height: ${row['height']}');
+      print('Weight: ${row['weight']}');
 
       // Helper function to convert BLOB to String
       String? blobToString(dynamic value) {
@@ -994,6 +998,8 @@ class DatabaseService {
             blobToString(row['treatment_plan']) ?? 'No treatment plan recorded',
         'medications':
             blobToString(row['medications']) ?? 'No medications recorded',
+        'height': row['height']?.toString() ?? 'Not recorded',
+        'weight': row['weight']?.toString() ?? 'Not recorded',
         'blood_pressure': row['blood_pressure_systolic'] != null &&
                 row['blood_pressure_diastolic'] != null
             ? '${row['blood_pressure_systolic']}/${row['blood_pressure_diastolic']}'
@@ -1007,6 +1013,8 @@ class DatabaseService {
       };
 
       print('\nReport details processed successfully');
+      print('Height value: ${reportDetails['height']}');
+      print('Weight value: ${reportDetails['weight']}');
       print('Returning data: $reportDetails');
       return reportDetails;
     } catch (e, stackTrace) {
