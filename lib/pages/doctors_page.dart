@@ -3,6 +3,7 @@ import '../services/database_service.dart';
 import '../pages/booking_page.dart';
 import '../services/auth_service.dart';
 import '../login.dart';
+import '../pages/chat_page.dart';
 
 class DoctorsPage extends StatefulWidget {
   const DoctorsPage({super.key});
@@ -56,12 +57,31 @@ class _DoctorsPageState extends State<DoctorsPage> {
                       itemCount: _doctors.length,
                       itemBuilder: (context, index) {
                         final doctor = _doctors[index];
-                        return _buildDoctorCard(
-                          name: doctor['name'],
-                          specialty: doctor['specialty'] ?? 'N/A',
-                          experience: doctor['experience'] ?? 'N/A',
-                          rating: doctor['rating']?.toDouble() ?? 0.0,
-                          doctorId: doctor['id'],
+                        return GestureDetector(
+                          onTap: () async {
+                            final currentUserId =
+                                await AuthService.instance.getCurrentUserId();
+                            if (currentUserId != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatPage(
+                                    patientId: currentUserId,
+                                    otherUserId: doctor['id'],
+                                  ),
+                                ),
+                              );
+                            } else {
+                              print('User is not logged in');
+                            }
+                          },
+                          child: _buildDoctorCard(
+                            name: doctor['name'],
+                            specialty: doctor['specialty'] ?? 'N/A',
+                            experience: doctor['experience'] ?? 'N/A',
+                            rating: doctor['rating']?.toDouble() ?? 0.0,
+                            doctorId: doctor['id'],
+                          ),
                         );
                       },
                     ),
@@ -106,7 +126,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Meet our experienced doctors and book your appointments!',
+            'Meet our experienced doctors! Book and Chat with them!',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 14,

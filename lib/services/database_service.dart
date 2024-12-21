@@ -619,41 +619,40 @@ class DatabaseService {
 
       // Modified query to get latest message with each doctor
       final results = await conn.query('''
-        SELECT 
-          m.*,
-          u_sender.name as sender_name,
-          u_sender.profile_picture as sender_profile_picture,
-          u_sender.role as sender_role,
-          u_receiver.name as receiver_name,
-          u_receiver.profile_picture as receiver_profile_picture,
-          u_receiver.role as receiver_role
-        FROM messages m
-        JOIN users u_sender ON m.sender_id = u_sender.id
-        JOIN users u_receiver ON m.receiver_id = u_receiver.id
-        INNER JOIN (
+        WITH RankedMessages AS (
           SELECT 
-            GREATEST(sender_id, receiver_id) as max_id,
-            LEAST(sender_id, receiver_id) as min_id,
-            MAX(id) as latest_message_id
-          FROM messages
-          WHERE sender_id = ? OR receiver_id = ?
-          GROUP BY GREATEST(sender_id, receiver_id), LEAST(sender_id, receiver_id)
-        ) latest ON m.id = latest.latest_message_id
-        WHERE (m.sender_id = ? OR m.receiver_id = ?)
-          AND (u_sender.role = 'doctor' OR u_receiver.role = 'doctor')
-        ORDER BY m.created_at DESC
-      ''', [patientId, patientId, patientId, patientId]);
+            m.*,
+            u_sender.name as sender_name,
+            u_sender.profile_picture as sender_profile_picture,
+            u_sender.role as sender_role,
+            u_receiver.name as receiver_name,
+            u_receiver.profile_picture as receiver_profile_picture,
+            u_receiver.role as receiver_role,
+            ROW_NUMBER() OVER (
+              PARTITION BY 
+                CASE 
+                  WHEN m.sender_id = ? THEN m.receiver_id 
+                  ELSE m.sender_id 
+                END
+              ORDER BY m.created_at DESC
+            ) as rn
+          FROM messages m
+          JOIN users u_sender ON m.sender_id = u_sender.id
+          JOIN users u_receiver ON m.receiver_id = u_receiver.id
+          WHERE (m.sender_id = ? OR m.receiver_id = ?)
+            AND (u_sender.role = 'doctor' OR u_receiver.role = 'doctor')
+        )
+        SELECT * FROM RankedMessages 
+        WHERE rn = 1
+        ORDER BY created_at DESC
+      ''', [patientId, patientId, patientId]);
 
       print('Found ${results.length} conversations');
 
       return results.map((row) {
-        // Convert Blob to String if necessary
         String messageText = row['message'] is Blob
             ? String.fromCharCodes((row['message'] as Blob).toBytes())
             : row['message'].toString();
-
-        // Determine if sender is doctor
-        bool isSenderDoctor = row['sender_role'] == 'doctor';
 
         return Message.fromMap({
           'id': row['id'],
@@ -685,8 +684,29 @@ class DatabaseService {
       int userId1, int userId2) async {
     try {
       final conn = await connection;
-      print('Fetching messages between users $userId1 and $userId2');
+      print('=== FETCHING MESSAGES BETWEEN USERS ===');
+      print('User 1 ID: $userId1');
+      print('User 2 ID: $userId2');
 
+      // First verify if both users exist and at least one is a doctor
+      final userCheckQuery = '''
+        SELECT id, name, role FROM users 
+        WHERE id IN (?, ?) AND (role = 'doctor' OR role = 'patient')
+      ''';
+
+      final userResults = await conn.query(userCheckQuery, [userId1, userId2]);
+      print('Found ${userResults.length} users:');
+      for (var user in userResults) {
+        print(
+            'User ID: ${user['id']}, Name: ${user['name']}, Role: ${user['role']}');
+      }
+
+      if (userResults.length != 2) {
+        print('Error: Could not find both users or invalid user roles');
+        return [];
+      }
+
+      // Then get the messages with role verification
       final results = await conn.query('''
         SELECT 
           m.id,
@@ -699,23 +719,57 @@ class DatabaseService {
           m.is_read,
           sender.name as sender_name,
           sender.profile_picture as sender_profile_picture,
+          sender.role as sender_role,
           receiver.name as receiver_name,
-          receiver.profile_picture as receiver_profile_picture
+          receiver.profile_picture as receiver_profile_picture,
+          receiver.role as receiver_role
         FROM messages m
         JOIN users sender ON m.sender_id = sender.id
         JOIN users receiver ON m.receiver_id = receiver.id
-        WHERE (m.sender_id = ? AND m.receiver_id = ?) 
-           OR (m.sender_id = ? AND m.receiver_id = ?)
+        WHERE ((m.sender_id = ? AND m.receiver_id = ?) 
+           OR (m.sender_id = ? AND m.receiver_id = ?))
+        AND (
+          (sender.role = 'doctor' AND receiver.role = 'patient')
+          OR 
+          (sender.role = 'patient' AND receiver.role = 'doctor')
+        )
         ORDER BY m.created_at ASC
       ''', [userId1, userId2, userId2, userId1]);
 
-      print('Found ${results.length} messages');
+      print('Found ${results.length} messages between users');
 
-      return results.map((row) {
+      if (results.isEmpty) {
+        print('No messages found between these users');
+        // Check if there are any messages at all for either user
+        final checkMessages = await conn.query('''
+          SELECT DISTINCT m.sender_id, m.receiver_id 
+          FROM messages m
+          JOIN users sender ON m.sender_id = sender.id
+          JOIN users receiver ON m.receiver_id = receiver.id
+          WHERE (m.sender_id IN (?, ?) OR m.receiver_id IN (?, ?))
+          AND (
+            (sender.role = 'doctor' AND receiver.role = 'patient')
+            OR 
+            (sender.role = 'patient' AND receiver.role = 'doctor')
+          )
+        ''', [userId1, userId2, userId1, userId2]);
+
+        print(
+            'Total message relationships for these users: ${checkMessages.length}');
+        for (var msg in checkMessages) {
+          print(
+              'Message relationship: ${msg['sender_id']} -> ${msg['receiver_id']}');
+        }
+      }
+
+      final messages = results.map((row) {
         // Convert Blob to String if necessary
         String messageText = row['message'] is Blob
             ? String.fromCharCodes((row['message'] as Blob).toBytes())
             : row['message'].toString();
+
+        print(
+            'Processing message: ID=${row['id']}, Sender=${row['sender_id']}, Receiver=${row['receiver_id']}');
 
         return Message.fromMap({
           'id': row['id'],
@@ -725,7 +779,7 @@ class DatabaseService {
           'image': row['image'] != null ? 'assets/${row['image']}' : null,
           'created_at': row['created_at'].toString(),
           'updated_at': row['updated_at'].toString(),
-          'is_read': row['is_read'],
+          'is_read': row['is_read'] ?? false,
           'sender_name': row['sender_name'],
           'sender_profile_picture': row['sender_profile_picture'] != null
               ? 'assets/${row['sender_profile_picture']}'
@@ -736,9 +790,14 @@ class DatabaseService {
               : 'assets/images/doctor_placeholder.png',
         });
       }).toList();
-    } catch (e) {
-      print('Error fetching messages: $e');
-      print('Stack trace: ${StackTrace.current}');
+
+      print('Successfully processed ${messages.length} messages');
+      print('=== END FETCHING MESSAGES ===');
+      return messages;
+    } catch (e, stackTrace) {
+      print('=== ERROR FETCHING MESSAGES ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }

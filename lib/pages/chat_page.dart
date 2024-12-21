@@ -24,16 +24,44 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    print('=== CHAT PAGE INITIALIZED ===');
+    print('Patient ID: ${widget.patientId}');
+    print('Doctor ID: ${widget.otherUserId}');
     _messagesFuture = _loadMessages();
   }
 
   Future<List<Message>> _loadMessages() async {
-    print(
-        'Loading messages for patient ${widget.patientId} and other user ${widget.otherUserId}');
-    final messages = await DatabaseService.instance
-        .getMessagesBetweenUsers(widget.patientId, widget.otherUserId);
-    print('Loaded ${messages.length} messages');
-    return messages;
+    print('=== LOADING CHAT MESSAGES ===');
+    print('Patient ID: ${widget.patientId}');
+    print('Other User ID: ${widget.otherUserId}');
+
+    if (widget.patientId <= 0 || widget.otherUserId <= 0) {
+      print('Invalid user IDs detected:');
+      print('Patient ID: ${widget.patientId}');
+      print('Other User ID: ${widget.otherUserId}');
+      throw Exception('Invalid user IDs');
+    }
+
+    try {
+      final messages = await DatabaseService.instance
+          .getMessagesBetweenUsers(widget.patientId, widget.otherUserId);
+
+      print('Loaded ${messages.length} messages');
+      if (messages.isEmpty) {
+        print('No messages found between users');
+      } else {
+        print('First message: ${messages.first.message}');
+        print('Last message: ${messages.last.message}');
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+      return messages;
+    } catch (e, stackTrace) {
+      print('Error loading messages: $e');
+      print('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<void> _handleSendMessage(String text) async {
@@ -48,13 +76,19 @@ class _ChatPageState extends State<ChatPage> {
       });
       // Scroll to bottom after sending message
       await Future.delayed(const Duration(milliseconds: 100));
+      _scrollToBottom();
+    } catch (e) {
+      print('Error sending message: $e');
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
       _scrollController.animateTo(
-        0,
+        _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
-    } catch (e) {
-      print('Error sending message: $e');
     }
   }
 
@@ -69,9 +103,24 @@ class _ChatPageState extends State<ChatPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Chat',
-          style: TextStyle(color: Colors.black87),
+        title: FutureBuilder<List<Message>>(
+          future: _messagesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              final otherUserName =
+                  widget.patientId == snapshot.data!.first.senderId
+                      ? snapshot.data!.first.receiverName
+                      : snapshot.data!.first.senderName;
+              return Text(
+                otherUserName ?? 'Chat',
+                style: const TextStyle(color: Colors.black87),
+              );
+            }
+            return const Text(
+              'Chat',
+              style: TextStyle(color: Colors.black87),
+            );
+          },
         ),
       ),
       body: Column(
@@ -85,13 +134,30 @@ class _ChatPageState extends State<ChatPage> {
                 }
 
                 if (snapshot.hasError) {
-                  print('Error loading messages: ${snapshot.error}');
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  print('Error in FutureBuilder: ${snapshot.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  print('No messages found');
-                  return const Center(child: Text('No messages yet.'));
+                  return const Center(
+                    child: Text(
+                      'No messages yet.\nStart a conversation!',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
                 }
 
                 final messages = snapshot.data!;
@@ -101,9 +167,9 @@ class _ChatPageState extends State<ChatPage> {
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: messages.length,
-                  reverse: true,
+                  reverse: false,
                   itemBuilder: (context, index) {
-                    final message = messages[messages.length - 1 - index];
+                    final message = messages[index];
                     final isPatient = message.senderId == widget.patientId;
                     print(
                         'Message ${index + 1}: ${message.message} - From: ${message.senderId}');
