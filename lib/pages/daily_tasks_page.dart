@@ -5,7 +5,14 @@ import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
 
 class DailyTasksPage extends StatefulWidget {
-  const DailyTasksPage({super.key});
+  final int patientId;
+  final String patientName;
+
+  const DailyTasksPage({
+    super.key,
+    required this.patientId,
+    required this.patientName,
+  });
 
   @override
   State<DailyTasksPage> createState() => _DailyTasksPageState();
@@ -58,14 +65,25 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
             icon: const Icon(Icons.arrow_back_ios),
             padding: EdgeInsets.zero,
           ),
-          const Expanded(
-            child: Text(
-              'Daily Tasks',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Daily Tasks',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  widget.patientName,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton(
@@ -139,15 +157,10 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
 
     return Expanded(
       child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: AuthService.instance.getCurrentUserId().then((userId) {
-          if (userId == null) {
-            throw Exception('No user logged in');
-          }
-          return DatabaseService.instance.getTasksByDate(
-            userId,
-            selectedDate: selectedDate,
-          );
-        }),
+        future: DatabaseService.instance.getTasksByDate(
+          widget.patientId,
+          selectedDate: selectedDate,
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

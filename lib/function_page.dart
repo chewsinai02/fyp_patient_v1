@@ -138,11 +138,20 @@ class FunctionPage extends StatelessWidget {
                 title: 'Daily Tasks',
                 icon: Icons.task_alt_outlined,
                 color: Colors.blue,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const DailyTasksPage()),
-                ),
+                onTap: () {
+                  final user = AuthService.instance.currentUser;
+                  if (user != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DailyTasksPage(
+                          patientId: user['id'],
+                          patientName: user['name'],
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
             ),
           ],

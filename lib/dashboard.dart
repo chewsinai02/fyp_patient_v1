@@ -194,7 +194,10 @@ class DashboardContent extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const DailyTasksPage(),
+                          builder: (context) => DailyTasksPage(
+                            patientId: int.parse(userData['id'].toString()),
+                            patientName: userData['name'],
+                          ),
                         ),
                       );
                     },

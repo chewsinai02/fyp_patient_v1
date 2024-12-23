@@ -3,6 +3,7 @@ import 'services/family_member_service.dart';
 import 'models/family_member.dart';
 import 'services/database_service.dart';
 import 'report_page.dart';
+import 'pages/daily_tasks_page.dart';
 
 class FamilyStatusPage extends StatefulWidget {
   const FamilyStatusPage({super.key});
@@ -214,7 +215,7 @@ class _FamilyStatusPageState extends State<FamilyStatusPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Monitor your family members\' health status',
+            'Track your family members\' health status',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 16,
@@ -351,50 +352,74 @@ class _FamilyStatusPageState extends State<FamilyStatusPage> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    IconButton(
-                      icon: Icon(Icons.delete_outline, color: Colors.red[400]),
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text('Remove Family Member'),
-                            content: Text(
-                                'Are you sure you want to remove $name from your family members?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: Text(
-                                  'Remove',
-                                  style: TextStyle(color: Colors.red),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.calendar_today,
+                              color: Colors.blue[400]),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DailyTasksPage(
+                                  patientId: memberId,
+                                  patientName: name,
                                 ),
                               ),
-                            ],
-                          ),
-                        );
+                            );
+                          },
+                          tooltip: 'View Calendar',
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline,
+                              color: Colors.red[400]),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text('Remove Family Member'),
+                                content: Text(
+                                    'Are you sure you want to remove $name from your family members?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: Text(
+                                      'Remove',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
 
-                        if (confirm == true) {
-                          try {
-                            await _familyService.removeFamilyMember(
-                                currentUserId, memberId);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      '$name removed from family members')),
-                            );
-                            _loadFamilyMembers();
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      'Failed to remove family member: $e')),
-                            );
-                          }
-                        }
-                      },
+                            if (confirm == true) {
+                              try {
+                                await _familyService.removeFamilyMember(
+                                    currentUserId, memberId);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          '$name removed from family members')),
+                                );
+                                _loadFamilyMembers();
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          'Failed to remove family member: $e')),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
