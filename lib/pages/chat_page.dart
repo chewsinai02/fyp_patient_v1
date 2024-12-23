@@ -95,30 +95,67 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
+        backgroundColor: Colors.deepPurple,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: FutureBuilder<List<Message>>(
           future: _messagesFuture,
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              final message = snapshot.data!.first;
+              final isOtherUserSender = message.senderId != widget.patientId;
               final otherUserName =
-                  widget.patientId == snapshot.data!.first.senderId
-                      ? snapshot.data!.first.receiverName
-                      : snapshot.data!.first.senderName;
-              return Text(
-                otherUserName ?? 'Chat',
-                style: const TextStyle(color: Colors.black87),
+                  isOtherUserSender ? message.senderName : message.receiverName;
+              final otherUserProfilePicture = isOtherUserSender
+                  ? message.senderProfilePicture
+                  : message.receiverProfilePicture;
+
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundImage: otherUserProfilePicture != null
+                        ? AssetImage(otherUserProfilePicture)
+                        : const AssetImage(
+                            'assets/images/doctor_placeholder.png',
+                          ) as ImageProvider,
+                    backgroundColor: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          otherUserName ?? 'Chat',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          'Online',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               );
             }
             return const Text(
               'Chat',
-              style: TextStyle(color: Colors.black87),
+              style: TextStyle(color: Colors.white),
             );
           },
         ),
@@ -171,18 +208,19 @@ class _ChatPageState extends State<ChatPage> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isPatient = message.senderId == widget.patientId;
-                    print(
-                        'Message ${index + 1}: ${message.message} - From: ${message.senderId}');
 
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 4, horizontal: 12),
                       child: Row(
                         mainAxisAlignment: isPatient
                             ? MainAxisAlignment.end
                             : MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           if (!isPatient) ...[
                             CircleAvatar(
+                              radius: 16,
                               backgroundImage: message.senderProfilePicture !=
                                       null
                                   ? AssetImage(message.senderProfilePicture!)
@@ -190,23 +228,34 @@ class _ChatPageState extends State<ChatPage> {
                                           'assets/images/doctor_placeholder.png')
                                       as ImageProvider,
                               backgroundColor: Colors.deepPurple.shade100,
-                              // Remove the child Text widget to eliminate the text
-                              // child: Text(
-                              //   message.senderName?[0] ?? '?',
-                              //   style:
-                              //       const TextStyle(color: Colors.deepPurple),
-                              // ),
                             ),
                             const SizedBox(width: 8),
                           ],
                           Flexible(
                             child: Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: isPatient
                                     ? Colors.deepPurple
                                     : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(20),
+                                  topRight: const Radius.circular(20),
+                                  bottomLeft:
+                                      Radius.circular(isPatient ? 20 : 0),
+                                  bottomRight:
+                                      Radius.circular(isPatient ? 0 : 20),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 5,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                               child: Column(
                                 crossAxisAlignment: isPatient
@@ -219,23 +268,24 @@ class _ChatPageState extends State<ChatPage> {
                                       color: isPatient
                                           ? Colors.white
                                           : Colors.black87,
+                                      fontSize: 15,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     formatTime(message.createdAt),
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       color: isPatient
                                           ? Colors.white70
-                                          : Colors.black54,
+                                          : Colors.black45,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          if (isPatient) const SizedBox(width: 8),
+                          if (isPatient) const SizedBox(width: 24),
                         ],
                       ),
                     );
