@@ -15,7 +15,7 @@ class ProfilePage extends StatelessWidget {
       backgroundColor: Colors.grey[100],
       body: CustomScrollView(
         slivers: [
-          _buildSliverAppBar(),
+          _buildSliverAppBar(context),
           SliverToBoxAdapter(
             child: Column(
               children: [
@@ -31,11 +31,26 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
       expandedHeight: 200,
       pinned: true,
       backgroundColor: Colors.deepPurple,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () {
+            // TODO: Implement notifications
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () {
+            Navigator.of(context).pushNamed('/settings');
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(

@@ -62,7 +62,18 @@ class SettingsPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                    child: Text(
+                      'Account Settings',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   _buildSettingsCard([
                     _buildSettingTile(
                       'Edit Profile',
@@ -143,6 +154,18 @@ class SettingsPage extends StatelessWidget {
                         );
                       },
                     ),
+                  ]),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                    child: Text(
+                      'Preferences',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  _buildSettingsCard([
                     _buildSettingTile(
                       'Notifications',
                       Icons.notifications_outlined,
@@ -154,6 +177,18 @@ class SettingsPage extends StatelessWidget {
                       value: 'English',
                       onTap: () {},
                     ),
+                  ]),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                    child: Text(
+                      'Support',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  _buildSettingsCard([
                     _buildSettingTile(
                       'Help Center',
                       Icons.help_outline,

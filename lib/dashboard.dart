@@ -89,7 +89,10 @@ class DashboardContent extends StatelessWidget {
                                     color: Colors.white,
                                     size: 24,
                                   ),
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    Navigator.of(context)
+                                        .pushNamed('/settings');
+                                  },
                                 ),
                               ],
                             ),

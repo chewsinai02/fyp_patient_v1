@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'firebase_options.dart';
 import 'login.dart';
+import 'pages/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,7 @@ class MyApp extends StatelessWidget {
       home: const InitialPage(),
       routes: {
         '/login': (context) => const LoginPage(),
+        '/settings': (context) => const SettingsPage(),
       },
     );
   }
