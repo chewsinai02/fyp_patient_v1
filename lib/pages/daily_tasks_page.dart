@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../services/database_service.dart';
+import '../services/auth_service.dart';
+import 'package:intl/intl.dart';
 
 class DailyTasksPage extends StatefulWidget {
   const DailyTasksPage({super.key});
@@ -132,46 +135,73 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
   }
 
   Widget _buildTasksList() {
-    // You can filter tasks based on _selectedDay
-    return Expanded(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _buildDateHeader(),
-          const SizedBox(height: 20),
-          _buildTaskCard(
-            title: 'Morning Medication',
-            time: '8:00 AM',
-            isCompleted: true,
-          ),
-          _buildTaskCard(
-            title: 'Blood Pressure Check',
-            time: '10:00 AM',
-            isCompleted: true,
-          ),
-          _buildTaskCard(
-            title: 'Afternoon Medication',
-            time: '2:00 PM',
-            isCompleted: false,
-          ),
-          _buildTaskCard(
-            title: 'Evening Walk',
-            time: '5:00 PM',
-            isCompleted: false,
-          ),
-        ],
-      ),
-    );
-  }
+    final selectedDate = _selectedDay ?? DateTime.now();
 
-  Widget _buildDateHeader() {
-    return Text(
-      _selectedDay == null
-          ? 'Today\'s Tasks'
-          : 'Tasks for ${_selectedDay!.day}/${_selectedDay!.month}/${_selectedDay!.year}',
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
+    return Expanded(
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: AuthService.instance.getCurrentUserId().then((userId) {
+          if (userId == null) {
+            throw Exception('No user logged in');
+          }
+          return DatabaseService.instance.getTasksByDate(
+            userId,
+            selectedDate: selectedDate,
+          );
+        }),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No tasks for ${DateFormat('MMM d, yyyy').format(selectedDate)}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final tasks = snapshot.data!;
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: tasks.length,
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              final dueDateTime = task['due_date'] as DateTime;
+              final timeString = DateFormat('h:mm a').format(dueDateTime);
+              final status = task['status'] as String;
+              final priority = task['priority'] as String;
+
+              // Check if this is a recurring task
+              final isRecurring = tasks
+                  .where((t) =>
+                      t['title'] == task['title'] &&
+                      t['due_date'] != task['due_date'])
+                  .isNotEmpty;
+
+              return _buildTaskCard(
+                title: task['title'],
+                time: timeString,
+                isCompleted: status == 'completed',
+                status: status,
+                priority: priority,
+                description: task['description'],
+                isRecurring: isRecurring,
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -180,6 +210,10 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
     required String title,
     required String time,
     required bool isCompleted,
+    required String status,
+    required String priority,
+    String? description,
+    bool isRecurring = false,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -200,14 +234,31 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isCompleted
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.1),
+              color: _getStatusColor(status).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              isCompleted ? Icons.check : Icons.access_time,
-              color: isCompleted ? Colors.green : Colors.grey,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _getStatusIcon(status),
+                  color: _getStatusColor(status),
+                ),
+                if (isRecurring) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.repeat,
+                    color: Colors.deepPurple,
+                    size: 16,
+                  ),
+                ],
+                const SizedBox(width: 4),
+                Icon(
+                  _getPriorityIcon(priority),
+                  color: _getPriorityColor(priority),
+                  size: 16,
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 16),
@@ -217,11 +268,13 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    decoration: isCompleted ? TextDecoration.lineThrough : null,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   time,
                   style: TextStyle(
@@ -229,11 +282,95 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
                     fontSize: 14,
                   ),
                 ),
+                if (description?.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description!,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: _getStatusColor(status).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              status.toUpperCase(),
+              style: TextStyle(
+                color: _getStatusColor(status),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'completed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'passed':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'completed':
+        return Icons.check_circle;
+      case 'pending':
+        return Icons.access_time;
+      case 'passed':
+        return Icons.warning;
+      default:
+        return Icons.help;
+    }
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority) {
+      case 'urgent':
+        return Colors.red;
+      case 'high':
+        return Colors.orange;
+      case 'medium':
+        return Colors.yellow[700]!;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getPriorityIcon(String priority) {
+    switch (priority) {
+      case 'urgent':
+        return Icons.priority_high;
+      case 'high':
+        return Icons.arrow_upward;
+      case 'medium':
+        return Icons.remove;
+      case 'low':
+        return Icons.arrow_downward;
+      default:
+        return Icons.remove;
+    }
   }
 }

@@ -52,7 +52,53 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
 
-          // Tasks List
+          // Add a header for the tasks section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Tasks for ${DateFormat('MMM d, yyyy').format(_selectedDay)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.repeat,
+                        size: 16,
+                        color: Colors.deepPurple,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Daily Tasks',
+                        style: TextStyle(
+                          color: Colors.deepPurple,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Updated Tasks List
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: AuthService.instance.getCurrentUserId().then((userId) {
@@ -96,6 +142,15 @@ class _CalendarPageState extends State<CalendarPage> {
                     final task = tasks[index];
                     final dueDateTime = task['due_date'] as DateTime;
                     final timeString = DateFormat('HH:mm').format(dueDateTime);
+                    final status = task['status'] as String;
+                    final priority = task['priority'] as String;
+
+                    // Check if this is a recurring task
+                    final isRecurring = tasks
+                        .where((t) =>
+                            t['title'] == task['title'] &&
+                            t['due_date'] != task['due_date'])
+                        .isNotEmpty;
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
@@ -103,16 +158,69 @@ class _CalendarPageState extends State<CalendarPage> {
                         vertical: 8,
                       ),
                       child: ListTile(
-                        leading: Icon(
-                          task['status'] == 'completed'
-                              ? Icons.check_circle
-                              : Icons.access_time,
-                          color: task['status'] == 'completed'
-                              ? Colors.green
-                              : Colors.grey,
+                        leading: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getStatusIcon(status),
+                              color: _getStatusColor(status),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _getPriorityIcon(priority),
+                              color: _getPriorityColor(priority),
+                              size: 20,
+                            ),
+                            if (isRecurring) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.repeat,
+                                color: Colors.deepPurple,
+                                size: 16,
+                              ),
+                            ],
+                          ],
                         ),
-                        title: Text(task['title']),
-                        subtitle: Text(timeString),
+                        title: Text(
+                          task['title'],
+                          style: TextStyle(
+                            decoration: status == 'completed'
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(timeString),
+                            if (task['description']?.isNotEmpty ?? false)
+                              Text(
+                                task['description'],
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(status).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            status.toUpperCase(),
+                            style: TextStyle(
+                              color: _getStatusColor(status),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   },

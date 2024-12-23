@@ -1,5 +1,6 @@
 import 'package:mysql1/mysql1.dart';
 import 'package:dotenv/dotenv.dart';
+import 'package:intl/intl.dart';
 import '../models/message.dart';
 
 class DatabaseService {
@@ -194,13 +195,9 @@ class DatabaseService {
 
       // Use selected date or default to today
       final date = selectedDate ?? DateTime.now();
+      final formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
-      // Format start and end of day for comparison
-      final startDate = DateTime(date.year, date.month, date.day, 0, 0, 0);
-      final endDate = DateTime(date.year, date.month, date.day, 23, 59, 59);
-
-      print('Fetching tasks between: $startDate and $endDate');
-
+      // Simplified query to get tasks for the specific date
       const query = '''
         SELECT 
           id, 
@@ -212,17 +209,16 @@ class DatabaseService {
           room_id
         FROM tasks 
         WHERE patient_id = ? 
-        AND due_date BETWEEN ? AND ?
+        AND DATE(due_date) = ?
         AND deleted_at IS NULL
-        ORDER BY due_date ASC
+        ORDER BY TIME(due_date) ASC
       ''';
 
       print('Executing Query with parameters:');
       print('Patient ID: $patientId');
-      print('Start: $startDate');
-      print('End: $endDate');
+      print('Selected Date: $formattedDate');
 
-      final results = await conn.query(query, [patientId, startDate, endDate]);
+      final results = await conn.query(query, [patientId, formattedDate]);
 
       print('Raw Results Count: ${results.length}');
 
@@ -243,17 +239,27 @@ class DatabaseService {
           }
         }
 
+        String convertToString(dynamic value) {
+          if (value == null) return '';
+          if (value is Blob) {
+            return String.fromCharCodes(value.toBytes());
+          }
+          return value.toString();
+        }
+
         final task = {
           'id': row['id'],
           'room_id': row['room_id'],
-          'title': row['title'],
-          'description': row['description'],
-          'status': row['status'],
-          'priority': row['priority'],
+          'title': convertToString(row['title']),
+          'description': row['description'] != null
+              ? convertToString(row['description'])
+              : null,
+          'status': convertToString(row['status']),
+          'priority': convertToString(row['priority']),
           'due_date': dueDate,
         };
+
         print('Processed Task: $task');
-        print('Due Date: ${dueDate?.toString()}');
         tasks.add(task);
       }
 
