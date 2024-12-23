@@ -11,6 +11,7 @@ class Message {
   final String? senderProfilePicture;
   final String? receiverName;
   final String? receiverProfilePicture;
+  final String? messageType;
 
   Message({
     required this.id,
@@ -25,6 +26,7 @@ class Message {
     this.senderProfilePicture,
     this.receiverName,
     this.receiverProfilePicture,
+    this.messageType,
   });
 
   factory Message.fromMap(Map<String, dynamic> map) {
@@ -41,6 +43,7 @@ class Message {
       senderProfilePicture: map['sender_profile_picture'],
       receiverName: map['receiver_name'],
       receiverProfilePicture: map['receiver_profile_picture'],
+      messageType: map['message_type'] ?? 'text',
     );
   }
 }

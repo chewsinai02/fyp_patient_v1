@@ -92,6 +92,23 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _handleImageMessage(String imageUrl, String caption) async {
+    try {
+      await DatabaseService().sendMessage(
+        senderId: widget.patientId,
+        receiverId: widget.otherUserId,
+        message: caption,
+        image: imageUrl,
+        messageType: 'image',
+      );
+      setState(() {
+        _messagesFuture = _loadMessages();
+      });
+    } catch (e) {
+      print('Error sending image message: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -238,7 +255,7 @@ class _ChatPageState extends State<ChatPage> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: isPatient
+                                color: message.senderId == widget.patientId
                                     ? Colors.deepPurple
                                     : Colors.white,
                                 borderRadius: BorderRadius.only(
@@ -262,15 +279,7 @@ class _ChatPageState extends State<ChatPage> {
                                     ? CrossAxisAlignment.end
                                     : CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    message.message,
-                                    style: TextStyle(
-                                      color: isPatient
-                                          ? Colors.white
-                                          : Colors.black87,
-                                      fontSize: 15,
-                                    ),
-                                  ),
+                                  _buildMessageContent(message),
                                   const SizedBox(height: 4),
                                   Text(
                                     formatTime(message.createdAt),
@@ -294,7 +303,10 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
-          MessageInput(onSendMessage: _handleSendMessage),
+          MessageInput(
+            onSendMessage: _handleSendMessage,
+            onSendImage: _handleImageMessage,
+          ),
         ],
       ),
     );
@@ -308,6 +320,69 @@ class _ChatPageState extends State<ChatPage> {
       return '${difference.inHours}h ago';
     } else {
       return '${difference.inDays}d ago';
+    }
+  }
+
+  Widget _buildMessageContent(Message message) {
+    if (message.messageType == 'image') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (message.message.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                message.message,
+                style: TextStyle(
+                  color: message.senderId == widget.patientId
+                      ? Colors.white
+                      : Colors.black87,
+                ),
+              ),
+            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              message.image ?? '',
+              width: 200, // Set a reasonable max width
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  width: 200,
+                  height: 150,
+                  alignment: Alignment.center,
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                print('Error loading image: $error');
+                return Container(
+                  width: 200,
+                  height: 150,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.error),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Text(
+        message.message,
+        style: TextStyle(
+          color: message.senderId == widget.patientId
+              ? Colors.white
+              : Colors.black87,
+          fontSize: 15,
+        ),
+      );
     }
   }
 }

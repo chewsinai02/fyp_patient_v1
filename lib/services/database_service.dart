@@ -792,10 +792,13 @@ class DatabaseService {
     required int receiverId,
     required String message,
     String? image,
+    String messageType = 'text',
   }) async {
     try {
       final conn = await connection;
-      print('Sending message from $senderId to $receiverId: $message');
+      print('Sending message from $senderId to $receiverId');
+      print('Message type: $messageType');
+      print('Image URL: $image');
 
       final timestamp = DateTime.now().toUtc().toString();
       await conn.query('''
@@ -806,9 +809,18 @@ class DatabaseService {
           image, 
           created_at, 
           updated_at, 
-          is_read
-        ) VALUES (?, ?, ?, ?, ?, ?, 0)
-      ''', [senderId, receiverId, message, image, timestamp, timestamp]);
+          is_read,
+          message_type
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+      ''', [
+        senderId,
+        receiverId,
+        message,
+        image,
+        timestamp,
+        timestamp,
+        messageType
+      ]);
 
       print('Message sent successfully');
     } catch (e) {

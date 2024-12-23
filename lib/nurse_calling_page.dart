@@ -50,7 +50,7 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
 
       await _databaseRef
           .child('nurse_calls')
-          .child('call_$_activeCallId')
+          .child(_activeCallId!)
           .child('locations')
           .update({
         'latitude': position.latitude,
@@ -74,24 +74,32 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
         throw 'Location permission denied';
       }
 
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
       );
 
-      // Get new call ID
-      final callRef = _databaseRef.child('nurse_calls').push();
-      final callId = callRef.key;
-      _activeCallId = callId; // Store the active call ID
+      try {
+        // Get current position
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
 
-      // Create emergency call data
-      final callData = {
-        'call_$callId': {
+        // Get new call ID
+        final callRef = _databaseRef.child('nurse_calls').push();
+        final callId = callRef.key;
+        _activeCallId = callId;
+
+        // Create emergency call data
+        final callData = {
           'patient_id': widget.patientId,
           'assigned_nurse_id': widget.assignedNurseId,
           'attended_at': null,
           'attended_by': null,
-          'bed_id': widget.bedNumber,
           'bed_number': widget.bedNumber,
           'room_id': widget.roomId,
           'floor': widget.floor,
@@ -105,30 +113,39 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
           'patient_name': widget.patientName,
           'room_number': widget.roomNumber,
           'timestamp': ServerValue.timestamp,
+        };
+
+        // Push data to 'nurse_calls' node
+        await callRef.set(callData);
+
+        // Hide loading indicator
+        if (context.mounted) {
+          Navigator.pop(context); // Remove loading indicator
         }
-      };
 
-      // Push data to 'nurse_calls' node
-      await _databaseRef.child('nurse_calls').update(callData);
-
-      // Start location updates
-      _locationTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        _updateLocation();
-      });
+        // Start location updates
+        _locationTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+          _updateLocation();
+        });
+      } catch (e) {
+        print('Database error: $e');
+        if (context.mounted) {
+          Navigator.pop(context); // Remove loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to send nurse call: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      debugPrint('Error sending nurse call: $e');
+      print('Error in emergency call: $e');
       if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text('Failed to send nurse call: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }

@@ -1,16 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'firebase_options.dart';
 import 'login.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    print('Initializing Firebase...');
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('Firebase initialized successfully');
+
+    // Test Firebase Storage
+    final storage = FirebaseStorage.instance;
+    print('Firebase Storage instance created: ${storage.bucket}');
+
+    // Initialize Firebase Database
+    final database = FirebaseDatabase.instance;
+    database.setPersistenceEnabled(true); // Enable offline persistence
+    print('Firebase Database initialized');
+  } catch (e, stackTrace) {
+    print('Error initializing Firebase:');
+    print('Error: $e');
+    print('Stack trace: $stackTrace');
+  }
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
