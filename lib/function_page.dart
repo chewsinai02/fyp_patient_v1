@@ -208,12 +208,17 @@ class FunctionPage extends StatelessWidget {
                 title: 'Profile',
                 icon: Icons.person_outline,
                 color: Colors.indigo,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfilePage(),
-                  ),
-                ),
+                onTap: () {
+                  final userData = AuthService.instance.currentUser;
+                  if (userData != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfilePage(userData: userData),
+                      ),
+                    );
+                  }
+                },
               ),
             ),
             const SizedBox(width: 16),

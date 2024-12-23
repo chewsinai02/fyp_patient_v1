@@ -25,7 +25,7 @@ class _MainLayoutState extends State<MainLayout> {
       DashboardContent(userData: widget.userData),
       MessagesPage(patientId: widget.userData['id'] ?? 0),
       const AppointmentPage(),
-      const ProfilePage(),
+      ProfilePage(userData: widget.userData),
     ];
     AuthService.instance.setCurrentUser(widget.userData);
   }

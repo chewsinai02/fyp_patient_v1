@@ -1,68 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  final Map<String, dynamic> userData;
+
+  const ProfilePage({
+    super.key,
+    required this.userData,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 20),
-              _buildProfileOptions(context),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: Colors.deepPurple.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person,
-              size: 50,
-              color: Colors.deepPurple,
-            ),
-          ),
-          const SizedBox(height: 15),
-          const Text(
-            'John Doe',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Patient ID: P12345',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(),
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                _buildProfileInfo(),
+                const SizedBox(height: 24),
+                _buildLogoutButton(context),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
         ],
@@ -70,189 +31,220 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileOptions(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          _buildSection(
-            title: 'Personal Information',
-            children: [
-              _buildOptionTile(
-                icon: Icons.person_outline,
-                title: 'Edit Profile',
-                onTap: () {},
-              ),
-              _buildOptionTile(
-                icon: Icons.health_and_safety_outlined,
-                title: 'Health Information',
-                onTap: () {},
-              ),
-              _buildOptionTile(
-                icon: Icons.family_restroom,
-                title: 'Family Members',
-                onTap: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSection(
-            title: 'App Settings',
-            children: [
-              _buildOptionTile(
-                icon: Icons.notifications_outlined,
-                title: 'Notifications',
-                onTap: () {},
-              ),
-              _buildOptionTile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy',
-                onTap: () {},
-              ),
-              _buildOptionTile(
-                icon: Icons.language_outlined,
-                title: 'Language',
-                trailing: Text(
-                  'English',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-                onTap: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSection(
-            title: 'Support',
-            children: [
-              _buildOptionTile(
-                icon: Icons.help_outline,
-                title: 'Help Center',
-                onTap: () {},
-              ),
-              _buildOptionTile(
-                icon: Icons.info_outline,
-                title: 'About Us',
-                onTap: () {},
-              ),
-              _buildOptionTile(
-                icon: Icons.phone_outlined,
-                title: 'Contact Support',
-                onTap: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildLogoutButton(context),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection({
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Container(
+  Widget _buildSliverAppBar() {
+    return SliverAppBar(
+      expandedHeight: 200,
+      pinned: true,
+      backgroundColor: Colors.deepPurple,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            children: children,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOptionTile({
-    required IconData icon,
-    required String title,
-    Widget? trailing,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.grey.withOpacity(0.1),
-              width: 1,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.deepPurple,
+                Colors.deepPurple.shade300,
+              ],
             ),
           ),
         ),
-        child: Row(
+        centerTitle: true,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: Colors.deepPurple,
-              size: 24,
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.white,
+              backgroundImage: userData['profile_picture'] != null &&
+                      userData['profile_picture'].toString().startsWith('http')
+                  ? NetworkImage(userData['profile_picture'])
+                  : userData['profile_picture'] != null
+                      ? AssetImage('assets/${userData['profile_picture']}')
+                      : const AssetImage('assets/images/profile.png')
+                          as ImageProvider,
             ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                ),
+            const SizedBox(height: 8),
+            Text(
+              userData['name'] ?? 'User',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            trailing ??
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey,
-                  size: 16,
-                ),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildProfileInfo() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildInfoTile(
+            icon: Icons.email_outlined,
+            title: 'Email',
+            value: userData['email'] ?? 'Not provided',
+          ),
+          _buildDivider(),
+          _buildInfoTile(
+            icon: Icons.phone_outlined,
+            title: 'Phone',
+            value: userData['phone'] ?? 'Not provided',
+          ),
+          _buildDivider(),
+          _buildInfoTile(
+            icon: Icons.person_outline,
+            title: 'Gender',
+            value: userData['gender'] ?? 'Not provided',
+          ),
+          _buildDivider(),
+          _buildInfoTile(
+            icon: Icons.location_on_outlined,
+            title: 'Address',
+            value: userData['address'] ?? 'Not provided',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoTile({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.deepPurple,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: Colors.grey[200],
+    );
+  }
+
   Widget _buildLogoutButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: ElevatedButton(
         onPressed: () {
-          // Handle logout
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Logout'),
+              content: const Text('Are you sure you want to logout?'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.clear();
+                    if (context.mounted) {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/login',
+                        (Route<dynamic> route) => false,
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          padding: const EdgeInsets.symmetric(vertical: 15),
+          backgroundColor: Colors.red.shade400,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(16),
           ),
+          elevation: 2,
         ),
-        child: const Text(
-          'Logout',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout_rounded),
+            SizedBox(width: 8),
+            Text(
+              'Logout',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

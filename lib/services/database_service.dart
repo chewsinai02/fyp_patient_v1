@@ -117,37 +117,43 @@ class DatabaseService {
       final conn = await connection;
       print('Getting tasks progress for patient ID: $patientId');
 
+      // Get today's date in the correct format
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
       // Get pending tasks count for today
       final pendingResult = await conn.query('''
         SELECT COUNT(*) as pending 
         FROM tasks 
         WHERE patient_id = ? 
-        AND DATE(due_date) = CURDATE() 
-        AND status = "pending"
-        ''', [patientId]);
+        AND DATE(due_date) = ?
+        AND status = 'pending'
+        AND deleted_at IS NULL
+        ''', [patientId, today]);
 
       // Get completed tasks count for today
       final completedResult = await conn.query('''
         SELECT COUNT(*) as completed 
         FROM tasks 
         WHERE patient_id = ? 
-        AND DATE(due_date) = CURDATE() 
-        AND status = "completed"
-        ''', [patientId]);
+        AND DATE(due_date) = ?
+        AND status = 'completed'
+        AND deleted_at IS NULL
+        ''', [patientId, today]);
 
       // Get passed tasks count for today
       final passedResult = await conn.query('''
         SELECT COUNT(*) as passed 
         FROM tasks 
         WHERE patient_id = ? 
-        AND DATE(due_date) = CURDATE() 
-        AND status = "passed"
-        ''', [patientId]);
+        AND DATE(due_date) = ?
+        AND status = 'passed'
+        AND deleted_at IS NULL
+        ''', [patientId, today]);
 
       print('Query results:');
-      print('Pending tasks: ${pendingResult.first}');
-      print('Completed tasks: ${completedResult.first}');
-      print('Passed tasks: ${passedResult.first}');
+      print('Pending tasks: ${pendingResult.first['pending']}');
+      print('Completed tasks: ${completedResult.first['completed']}');
+      print('Passed tasks: ${passedResult.first['passed']}');
 
       final pending = pendingResult.first['pending'] as int;
       final completed = completedResult.first['completed'] as int;
@@ -160,14 +166,17 @@ class DatabaseService {
       print('Completed tasks: $completed');
       print('Passed tasks: $passed');
       print('Total tasks: $total');
-      print('Progress ratio: ${total > 0 ? completed / total : 0.0}');
+
+      // Calculate progress as a ratio of completed tasks to total tasks
+      final progress = total > 0 ? completed / total : 0.0;
+      print('Progress ratio: $progress');
 
       return {
         'total': total,
         'completed': completed,
         'pending': pending,
         'passed': passed,
-        'progress': total > 0 ? completed / total : 0.0,
+        'progress': progress,
       };
     } catch (e, stackTrace) {
       print('Error getting tasks progress:');
