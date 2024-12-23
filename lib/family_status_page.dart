@@ -4,6 +4,7 @@ import 'models/family_member.dart';
 import 'services/database_service.dart';
 import 'report_page.dart';
 import 'pages/daily_tasks_page.dart';
+import 'services/auth_service.dart';
 
 class FamilyStatusPage extends StatefulWidget {
   const FamilyStatusPage({super.key});
@@ -18,7 +19,14 @@ class _FamilyStatusPageState extends State<FamilyStatusPage> {
   String? _error;
   List<FamilyMember> _familyMembers = [];
   bool _isDisposed = false;
-  final int currentUserId = 11;
+
+  int get currentUserId {
+    final user = AuthService.instance.currentUser;
+    if (user == null) {
+      throw Exception('No user logged in');
+    }
+    return user['id'];
+  }
 
   @override
   void initState() {

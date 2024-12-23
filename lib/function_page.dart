@@ -169,15 +169,13 @@ class FunctionPage extends StatelessWidget {
           children: [
             Expanded(
               child: _buildFunctionCard(
-                title: 'Chat',
-                icon: Icons.chat_bubble_outline,
-                color: Colors.green,
+                title: 'Our Doctors',
+                icon: Icons.medical_services_outlined,
+                color: Colors.teal,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => MessagesPage(
-                      patientId: AuthService.instance.currentUser?['id'] ?? 0,
-                    ),
+                    builder: (context) => const DoctorsPage(),
                   ),
                 ),
               ),
@@ -194,25 +192,6 @@ class FunctionPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildFunctionCard(
-                title: 'Our Doctors',
-                icon: Icons.medical_services_outlined,
-                color: Colors.teal,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DoctorsPage(),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(child: SizedBox()),
-          ],
-        ),
       ],
     );
   }
