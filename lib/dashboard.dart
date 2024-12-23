@@ -6,6 +6,7 @@ import 'function_page.dart';
 import 'pages/daily_tasks_page.dart';
 import 'services/database_service.dart';
 import 'pages/messages_page.dart';
+import 'pages/settings_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -82,8 +83,13 @@ class DashboardContent extends StatelessWidget {
                                     size: 24,
                                   ),
                                   onPressed: () {
-                                    Navigator.of(context)
-                                        .pushNamed('/settings');
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const SettingsPage(),
+                                      ),
+                                    );
                                   },
                                 ),
                               ],

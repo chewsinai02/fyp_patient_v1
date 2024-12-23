@@ -6,6 +6,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'firebase_options.dart';
 import 'login.dart';
 import 'pages/settings_page.dart';
+import 'pages/edit_profile_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginPage(),
         '/settings': (context) => const SettingsPage(),
+        '/edit-profile': (context) => const EditProfilePage(),
       },
     );
   }

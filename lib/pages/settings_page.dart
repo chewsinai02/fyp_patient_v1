@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'edit_profile_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -79,7 +80,12 @@ class SettingsPage extends StatelessWidget {
                       'Edit Profile',
                       Icons.person_outline,
                       onTap: () {
-                        // Navigate to edit profile page
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfilePage(),
+                          ),
+                        );
                       },
                     ),
                     _buildSettingTile(

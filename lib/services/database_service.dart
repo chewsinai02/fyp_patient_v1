@@ -1214,4 +1214,36 @@ class DatabaseService {
       print('Error marking messages as read: $e');
     }
   }
+
+  // Add this method to DatabaseService class
+  Future<void> updateUserProfile({
+    required int userId,
+    required String name,
+    required String email,
+    required String phone,
+    required String address,
+    String? gender,
+  }) async {
+    try {
+      final conn = await connection;
+      print('Updating profile for user ID: $userId');
+
+      await conn.query('''
+        UPDATE users 
+        SET 
+          name = ?,
+          email = ?,
+          contact_number = ?,
+          address = ?,
+          gender = ?,
+          updated_at = NOW()
+        WHERE id = ?
+      ''', [name, email, phone, address, gender, userId]);
+
+      print('Profile updated successfully');
+    } catch (e) {
+      print('Error updating profile: $e');
+      rethrow;
+    }
+  }
 }
