@@ -1168,4 +1168,50 @@ class DatabaseService {
       return [];
     }
   }
+
+  // Add this method to DatabaseService class
+  Future<int> getUnreadMessageCount(int userId) async {
+    try {
+      final conn = await connection;
+      print('=== FETCHING READ MESSAGES ===');
+      print('User ID: $userId');
+
+      const query = '''
+        SELECT COUNT(*) as read_count 
+        FROM messages 
+        WHERE receiver_id = ? 
+        AND is_read = 1
+      ''';
+
+      final results = await conn.query(query, [userId]);
+      final readCount = results.first['read_count'] as int;
+
+      print('Read message count: $readCount');
+      return readCount;
+    } catch (e) {
+      print('Error getting read message count: $e');
+      return 0;
+    }
+  }
+
+  // Add this method to mark messages as read
+  Future<void> markMessagesAsRead(int senderId, int receiverId) async {
+    try {
+      final conn = await connection;
+      print('Marking messages as read between $senderId and $receiverId');
+
+      await conn.query('''
+        UPDATE messages 
+        SET is_read = 1, 
+            updated_at = NOW()
+        WHERE sender_id = ? 
+        AND receiver_id = ? 
+        AND is_read = 0
+      ''', [senderId, receiverId]);
+
+      print('Messages marked as read successfully');
+    } catch (e) {
+      print('Error marking messages as read: $e');
+    }
+  }
 }

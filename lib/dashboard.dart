@@ -5,6 +5,7 @@ import 'appointment_page.dart';
 import 'function_page.dart';
 import 'pages/daily_tasks_page.dart';
 import 'services/database_service.dart';
+import 'pages/messages_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -70,16 +71,7 @@ class DashboardContent extends StatelessWidget {
                             ),
                             Row(
                               children: [
-                                IconButton(
-                                  padding: const EdgeInsets.all(8),
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(
-                                    Icons.notifications_none_rounded,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                  onPressed: () {},
-                                ),
+                                _buildNotificationBadge(),
                                 const SizedBox(width: 8),
                                 IconButton(
                                   padding: const EdgeInsets.all(8),
@@ -419,6 +411,77 @@ class DashboardContent extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNotificationBadge() {
+    return FutureBuilder<int>(
+      future: DatabaseService.instance.getUnreadMessageCount(userData['id']),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data! > 0) {
+          return Stack(
+            children: [
+              IconButton(
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MessagesPage(
+                        patientId: int.parse(userData['id'].toString()),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    snapshot.data! > 99 ? '99+' : snapshot.data!.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        return IconButton(
+          padding: const EdgeInsets.all(8),
+          constraints: const BoxConstraints(),
+          icon: const Icon(
+            Icons.notifications_none_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MessagesPage(
+                  patientId: int.parse(userData['id'].toString()),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

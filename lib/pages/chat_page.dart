@@ -28,6 +28,12 @@ class _ChatPageState extends State<ChatPage> {
     print('Patient ID: ${widget.patientId}');
     print('Doctor ID: ${widget.otherUserId}');
     _messagesFuture = _loadMessages();
+
+    // Mark messages as read when chat is opened
+    DatabaseService.instance.markMessagesAsRead(
+      widget.otherUserId,
+      widget.patientId,
+    );
   }
 
   Future<List<Message>> _loadMessages() async {

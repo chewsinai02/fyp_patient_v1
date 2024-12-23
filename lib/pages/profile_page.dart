@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/database_service.dart';
+import 'messages_page.dart';
 
 class ProfilePage extends StatelessWidget {
   final Map<String, dynamic> userData;
@@ -33,18 +35,23 @@ class ProfilePage extends StatelessWidget {
 
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 200,
+      expandedHeight: 240,
       pinned: true,
       backgroundColor: Colors.deepPurple,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          onPressed: () {
-            // TODO: Implement notifications
-          },
+      leading: IconButton(
+        icon: const Icon(
+          Icons.arrow_back_ios,
+          color: Colors.white,
         ),
+        onPressed: () => Navigator.pop(context),
+      ),
+      actions: [
+        _buildNotificationBadge(context),
         IconButton(
-          icon: const Icon(Icons.settings_outlined),
+          icon: const Icon(
+            Icons.settings_outlined,
+            color: Colors.white,
+          ),
           onPressed: () {
             Navigator.of(context).pushNamed('/settings');
           },
@@ -63,33 +70,109 @@ class ProfilePage extends StatelessWidget {
               ],
             ),
           ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 56),
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.white,
+                  backgroundImage: userData['profile_picture'] != null &&
+                          userData['profile_picture']
+                              .toString()
+                              .startsWith('http')
+                      ? NetworkImage(userData['profile_picture'])
+                      : userData['profile_picture'] != null
+                          ? AssetImage('assets/${userData['profile_picture']}')
+                          : const AssetImage('assets/images/profile.png')
+                              as ImageProvider,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  userData['name'] ?? 'User',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         centerTitle: true,
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: Colors.white,
-              backgroundImage: userData['profile_picture'] != null &&
-                      userData['profile_picture'].toString().startsWith('http')
-                  ? NetworkImage(userData['profile_picture'])
-                  : userData['profile_picture'] != null
-                      ? AssetImage('assets/${userData['profile_picture']}')
-                      : const AssetImage('assets/images/profile.png')
-                          as ImageProvider,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              userData['name'] ?? 'User',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
+    );
+  }
+
+  Widget _buildNotificationBadge(BuildContext context) {
+    return FutureBuilder<int>(
+      future: DatabaseService.instance
+          .getUnreadMessageCount(int.parse(userData['id'].toString())),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data! > 0) {
+          return Stack(
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MessagesPage(
+                        patientId: int.parse(userData['id'].toString()),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    snapshot.data! > 99 ? '99+' : snapshot.data!.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        return IconButton(
+          icon: const Icon(
+            Icons.notifications_outlined,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MessagesPage(
+                  patientId: int.parse(userData['id'].toString()),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
