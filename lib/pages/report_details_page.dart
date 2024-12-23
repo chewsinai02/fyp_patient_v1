@@ -357,15 +357,15 @@ class ReportDetailsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.medical_information,
                   color: Colors.deepPurple,
                   size: 24,
                 ),
-                const SizedBox(width: 8),
-                const Text(
+                SizedBox(width: 8),
+                Text(
                   'Diagnosis & Symptoms',
                   style: TextStyle(
                     fontSize: 18,
@@ -438,15 +438,15 @@ class ReportDetailsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.healing,
                   color: Colors.green,
                   size: 24,
                 ),
-                const SizedBox(width: 8),
-                const Text(
+                SizedBox(width: 8),
+                Text(
                   'Treatment Plan',
                   style: TextStyle(
                     fontSize: 18,

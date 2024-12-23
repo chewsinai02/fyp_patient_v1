@@ -22,7 +22,7 @@ class _BookingPageState extends State<BookingPage> {
   DateTime? _selectedDate;
   String? _selectedTime;
   String? _notes;
-  Map<DateTime, List<String>> _availableSlots = {};
+  final Map<DateTime, List<String>> _availableSlots = {};
 
   // Mapping of database times to display times (reverse of the original map)
   final Map<String, String> _dbToDisplayTime = {
@@ -78,7 +78,7 @@ class _BookingPageState extends State<BookingPage> {
               child: Center(
                 child: Text(
                   '${date.day}',
-                  style: TextStyle(color: Colors.grey),
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ),
             );
@@ -200,7 +200,7 @@ class _BookingPageState extends State<BookingPage> {
                   return isSameDay(_selectedDate, day);
                 },
                 calendarStyle: CalendarStyle(
-                  selectedDecoration: BoxDecoration(
+                  selectedDecoration: const BoxDecoration(
                     color: Colors.deepPurple,
                     shape: BoxShape.circle,
                   ),

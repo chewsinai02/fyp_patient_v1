@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../pages/booking_page.dart';
 import '../services/auth_service.dart';
-import '../login.dart';
 import '../pages/chat_page.dart';
 
 class DoctorsPage extends StatefulWidget {
@@ -250,7 +249,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
+                child: const Text(
                   'Available',
                   style: TextStyle(
                     color: Colors.green,
@@ -267,54 +266,17 @@ class _DoctorsPageState extends State<DoctorsPage> {
                   print(
                       'Current user when booking: $currentUser'); // Debug print
 
-                  if (currentUser != null) {
-                    print('User is logged in, proceeding to booking');
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BookingPage(
-                          doctorName: name,
-                          doctorId: doctorId,
-                        ),
+                  print('User is logged in, proceeding to booking');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BookingPage(
+                        doctorName: name,
+                        doctorId: doctorId,
                       ),
-                    );
-                  } else {
-                    print('No user found in AuthService when trying to book');
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Login Required'),
-                        content:
-                            const Text('Please login to book an appointment.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              // Navigate to login page
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const LoginPage(),
-                                ),
-                              ).then((_) {
-                                // Check login state after returning from login page
-                                final user =
-                                    AuthService.instance.getCurrentUserId();
-                                print(
-                                    'Returned from login page, current user: $user');
-                              });
-                            },
-                            child: const Text('Login'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                },
+                    ),
+                  );
+                                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                   shape: RoundedRectangleBorder(

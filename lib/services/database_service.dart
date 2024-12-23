@@ -1,13 +1,6 @@
 import 'package:mysql1/mysql1.dart';
 import 'package:dotenv/dotenv.dart';
-import 'dart:io';
-import 'package:bcrypt/bcrypt.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:flutter/material.dart';
 import '../models/message.dart';
-import 'package:intl/intl.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -222,7 +215,7 @@ class DatabaseService {
 
       print('Fetching tasks between: $startDate and $endDate');
 
-      final query = '''
+      const query = '''
         SELECT 
           id, 
           title, 
@@ -295,7 +288,7 @@ class DatabaseService {
       print('=== FETCHING DOCTORS START ===');
       final conn = await connection;
 
-      final query = '''
+      const query = '''
         SELECT 
           id,
           name,
@@ -332,7 +325,7 @@ class DatabaseService {
         String profilePicture =
             row['profile_picture'] ?? '/images/default_avatar.png';
         if (!profilePicture.startsWith('/')) {
-          profilePicture = '/${profilePicture}';
+          profilePicture = '/$profilePicture';
         }
 
         final doctor = {
@@ -382,7 +375,7 @@ class DatabaseService {
   }) async {
     try {
       final conn = await connection;
-      final query = '''
+      const query = '''
         INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, notes)
         VALUES (?, ?, ?, ?, 'active', ?)
       ''';
@@ -420,7 +413,7 @@ class DatabaseService {
       final formattedDate = date.toIso8601String().split('T')[0];
 
       // Get all booked appointments for the specified doctor and date
-      final query = '''
+      const query = '''
         SELECT TIME_FORMAT(appointment_time, '%H:%i:%s') as appointment_time 
         FROM appointments 
         WHERE doctor_id = ? 
@@ -536,7 +529,7 @@ class DatabaseService {
       print('Fetching appointments for patient ID: $patientId');
 
       // First, get the doctor's profile picture
-      final doctorQuery = '''
+      const doctorQuery = '''
         SELECT 
           d.id as doctor_id,
           d.profile_picture
@@ -553,7 +546,7 @@ class DatabaseService {
       }
 
       // Then get the appointments
-      final query = '''
+      const query = '''
         SELECT 
           a.id,
           a.appointment_date,
@@ -582,7 +575,7 @@ class DatabaseService {
 
         // Ensure profile picture starts with a forward slash
         if (!profilePicture.startsWith('/')) {
-          profilePicture = '/${profilePicture}';
+          profilePicture = '/$profilePicture';
         }
 
         print(
@@ -689,7 +682,7 @@ class DatabaseService {
       print('User 2 ID: $userId2');
 
       // First verify if both users exist and at least one is a doctor
-      final userCheckQuery = '''
+      const userCheckQuery = '''
         SELECT id, name, role FROM users 
         WHERE id IN (?, ?) AND (role = 'doctor' OR role = 'patient')
       ''';
@@ -844,7 +837,7 @@ class DatabaseService {
         [patientId],
       );
       print(
-          'Patient check result: ${patientCheck.length > 0 ? 'Found' : 'Not found'}');
+          'Patient check result: ${patientCheck.isNotEmpty ? 'Found' : 'Not found'}');
 
       // Get total reports count for this patient
       final countResult = await conn.query(
@@ -853,7 +846,7 @@ class DatabaseService {
       );
       print('Total reports in database: ${countResult.first['count']}');
 
-      final query = '''
+      const query = '''
         SELECT 
           id,
           title,
@@ -929,7 +922,7 @@ class DatabaseService {
         return null;
       }
 
-      final query = '''
+      const query = '''
         SELECT 
           r.id,
           r.title,
@@ -1022,6 +1015,68 @@ class DatabaseService {
       print('Error: $e');
       print('Stack trace: $stackTrace');
       return null;
+    }
+  }
+
+  // Add this method to DatabaseService class
+  Future<Map<String, dynamic>> getUserById(int userId) async {
+    try {
+      final conn = await connection;
+      print('Fetching user data for ID: $userId');
+
+      // Join query to get all required information
+      final results = await conn.query('''
+        SELECT 
+          u.id,
+          u.name as patient_name,
+          b.id as bed_id,
+          b.bed_number,
+          b.room_id,
+          r.room_number,
+          r.floor,
+          ns.nurse_id,
+          ns.shift
+        FROM users u
+        JOIN beds b ON b.patient_id = u.id
+        JOIN rooms r ON b.room_id = r.id
+        LEFT JOIN nurse_schedules ns ON ns.room_id = r.id
+        WHERE u.id = ?
+        AND ns.date = CURDATE()
+        AND ns.status = 'scheduled'
+        AND (
+          (HOUR(NOW()) BETWEEN 7 AND 14 AND ns.shift = 'morning') OR
+          (HOUR(NOW()) BETWEEN 15 AND 22 AND ns.shift = 'afternoon') OR
+          ((HOUR(NOW()) >= 23 OR HOUR(NOW()) <= 6) AND ns.shift = 'night')
+        )
+      ''', [userId]);
+
+      if (results.isEmpty) {
+        throw Exception('User not found');
+      }
+
+      final userData = {
+        'patient_name': results.first['patient_name'],
+        'room_number': results.first['room_number'],
+        'bed_number': results.first['bed_number'],
+        'room_id': results.first['room_id'],
+        'floor': results.first['floor'],
+        'assigned_nurse_id': results.first['nurse_id'],
+        'current_shift': results.first['shift'],
+      };
+
+      print('Fetched user data: $userData');
+      return userData;
+    } catch (e) {
+      print('Error fetching user data: $e');
+      return {
+        'patient_name': 'Unknown Patient',
+        'room_number': 101,
+        'bed_number': 1,
+        'room_id': 1,
+        'floor': 1,
+        'assigned_nurse_id': null,
+        'current_shift': null,
+      };
     }
   }
 }

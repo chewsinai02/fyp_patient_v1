@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../dashboard.dart';
-import 'chat_page.dart';
 import '../appointment_page.dart';
 import 'profile_page.dart';
 import '../services/auth_service.dart';

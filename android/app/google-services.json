@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "500961952253",
+    "firebase_url": "https://fyptestv2-37c45-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "fyptestv2-37c45",
+    "storage_bucket": "fyptestv2-37c45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:500961952253:android:073bf5cb1dd11aae67d994",
+        "android_client_info": {
+          "package_name": "com.example.fyp_patient_v1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMpnsnBC4Sr7NqGvsdlOkCbZKLxE_ObBc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

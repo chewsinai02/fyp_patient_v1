@@ -7,8 +7,6 @@ pluginManagement {
         return flutterSdkPath
     }()
 
-    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
     repositories {
         google()
         mavenCentral()
@@ -16,10 +14,14 @@ pluginManagement {
     }
 }
 
-plugins {
-    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "7.3.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+def localProperties = new Properties()
+def localPropertiesFile = new File(settingsDir, "local.properties")
+def flutterSdkPath
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+    flutterSdkPath = localProperties.getProperty('flutter.sdk')
 }
 
 include ":app"
+
+apply from: "${flutterSdkPath}/packages/flutter_tools/gradle/app_plugin_loader.gradle"

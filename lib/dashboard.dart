@@ -3,8 +3,6 @@ import 'nurse_calling_page.dart';
 import 'family_status_page.dart';
 import 'appointment_page.dart';
 import 'function_page.dart';
-import 'pages/chat_page.dart';
-import 'pages/profile_page.dart';
 import 'pages/daily_tasks_page.dart';
 import 'services/database_service.dart';
 
@@ -62,9 +60,9 @@ class DashboardContent extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            const Text(
                               'Dashboard',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -115,10 +113,10 @@ class DashboardContent extends StatelessWidget {
                                 radius: 22,
                                 backgroundColor: Colors.white,
                                 backgroundImage: userData[
-                                            'assets/' + 'profile_picture'] !=
+                                            'assets/' 'profile_picture'] !=
                                         null
                                     ? NetworkImage(
-                                        userData['assets/' + 'profile_picture'])
+                                        userData['assets/' 'profile_picture'])
                                     : const AssetImage(
                                             'assets/images/profile.png')
                                         as ImageProvider,
@@ -231,7 +229,7 @@ class DashboardContent extends StatelessWidget {
                             LinearProgressIndicator(
                               value: progress,
                               backgroundColor: Colors.grey[200],
-                              valueColor: AlwaysStoppedAnimation<Color>(
+                              valueColor: const AlwaysStoppedAnimation<Color>(
                                   Colors.deepPurple),
                               minHeight: 10,
                               borderRadius: BorderRadius.circular(5),
@@ -272,11 +270,45 @@ class DashboardContent extends StatelessWidget {
                   description: 'Request immediate assistance',
                   color: Colors.red.shade100,
                   iconColor: Colors.red,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const NurseCallingPage(),
-                    ),
-                  ),
+                  onTap: () async {
+                    try {
+                      // Fetch user data based on patient ID
+                      final userId = int.parse(userData['id'].toString());
+                      final patientData =
+                          await DatabaseService.instance.getUserById(userId);
+
+                      if (context.mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => NurseCallingPage(
+                              patientId: userId,
+                              patientName: patientData['patient_name'],
+                              roomNumber: patientData['room_number'] is String
+                                  ? int.parse(patientData['room_number'])
+                                  : patientData['room_number'],
+                              bedNumber: patientData['bed_number'] is String
+                                  ? int.parse(patientData['bed_number'])
+                                  : patientData['bed_number'],
+                              roomId: patientData['room_id'] is String
+                                  ? int.parse(patientData['room_id'])
+                                  : patientData['room_id'],
+                              floor: patientData['floor'] is String
+                                  ? int.parse(patientData['floor'])
+                                  : patientData['floor'],
+                              assignedNurseId: patientData['assigned_nurse_id']
+                                      is String
+                                  ? int.parse(patientData['assigned_nurse_id'])
+                                  : patientData['assigned_nurse_id'],
+                              currentShift: patientData['current_shift'],
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      print('Error navigating to nurse call: $e');
+                      // Handle error appropriately
+                    }
+                  },
                 ),
                 _buildQuickActionCard(
                   context: context,

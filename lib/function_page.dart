@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'nurse_calling_page.dart';
 import 'pages/daily_tasks_page.dart';
 // import 'pages/medications_page.dart'; // Commented out
-import 'pages/chat_page.dart';
 import 'pages/reports_page.dart';
 // import 'pages/vitals_page.dart'; // Commented out
 import 'pages/profile_page.dart';
@@ -120,7 +119,16 @@ class FunctionPage extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const NurseCallingPage()),
+                      builder: (context) => const NurseCallingPage(
+                            patientId: 1,
+                            patientName: 'John Doe',
+                            roomNumber: 101,
+                            roomId: 1,
+                            bedNumber: 1,
+                            floor: 1,
+                            currentShift: 'morning',
+                            assignedNurseId: 1,
+                          )),
                 ),
               ),
             ),

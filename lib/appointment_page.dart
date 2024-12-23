@@ -65,7 +65,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => DoctorsPage()), // Navigate to DoctorPage
+                builder: (context) => const DoctorsPage()), // Navigate to DoctorPage
           );
         },
         backgroundColor: Colors.deepPurple,
