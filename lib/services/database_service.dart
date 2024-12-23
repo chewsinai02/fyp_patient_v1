@@ -5,6 +5,9 @@ import '../models/message.dart';
 class DatabaseService {
   static DatabaseService? _instance;
   MySqlConnection? _conn;
+  bool _isConnecting = false;
+  static const int _maxConnections = 5;
+  static int _currentConnections = 0;
 
   DatabaseService._();
 
@@ -14,63 +17,46 @@ class DatabaseService {
   }
 
   Future<MySqlConnection> get connection async {
-    print('=== DATABASE CONNECTION START ===');
+    if (_conn != null) {
+      return _conn!;
+    }
+
+    if (_isConnecting) {
+      await Future.delayed(Duration(seconds: 1));
+      return connection;
+    }
+
+    if (_currentConnections >= _maxConnections) {
+      await close(); // Close existing connections
+      _currentConnections = 0;
+    }
 
     try {
-      var env = DotEnv();
-      print('Loading environment variables...');
-
-      // Try multiple possible paths
-      List<String> possiblePaths = [
-        '.env',
-        '../.env',
-        'lib/.env',
-        'assets/.env',
-      ];
-
-      bool loaded = false;
-      for (String path in possiblePaths) {
-        try {
-          print('\nTrying to load .env from: $path');
-          env.load([path]);
-          loaded = true;
-          print('Successfully loaded .env from: $path');
-          break;
-        } catch (e) {
-          print('Failed to load from $path: $e');
-        }
-      }
-
-      if (!loaded) {
-        throw 'Could not find or load .env file';
-      }
+      _isConnecting = true;
+      _currentConnections++;
 
       final settings = ConnectionSettings(
-        host:
-            'mydb.cdsagqe648ba.ap-southeast-2.rds.amazonaws.com', // AWS RDS endpoint
+        host: 'mydb.cdsagqe648ba.ap-southeast-2.rds.amazonaws.com',
         port: 3306,
         user: 'admin',
         password: 'admin1234',
         db: 'mydb1',
-        timeout: const Duration(
-            seconds: 30), // Increased timeout for remote connection
+        timeout: Duration(seconds: 30),
       );
 
-      print('\nAttempting to establish connection to AWS RDS...');
       _conn = await MySqlConnection.connect(settings);
-      print('Connection to AWS RDS established successfully!');
       return _conn!;
-    } catch (e, stackTrace) {
-      print('=== DATABASE CONNECTION ERROR ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      rethrow;
+    } finally {
+      _isConnecting = false;
     }
   }
 
   Future<void> close() async {
-    await _conn?.close();
-    _conn = null;
+    if (_conn != null) {
+      await _conn!.close();
+      _conn = null;
+      _currentConnections--;
+    }
   }
 
   // Update authentication method to handle bcrypt passwords
@@ -1077,6 +1063,82 @@ class DatabaseService {
         'assigned_nurse_id': null,
         'current_shift': null,
       };
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> query(String sql,
+      [List<dynamic>? params]) async {
+    try {
+      print('\n=== DATABASE QUERY START ===');
+      print('SQL: $sql');
+      print('Parameters: $params');
+
+      final conn = await connection;
+      final results = await conn.query(sql, params);
+
+      print('Query executed successfully');
+      print('Number of rows returned: ${results.length}');
+
+      // Convert Results to List<Map<String, dynamic>>
+      final mappedResults = results.map((row) => row.fields).toList();
+
+      print('Results converted to map successfully');
+      print('=== DATABASE QUERY END ===\n');
+
+      return mappedResults;
+    } catch (e, stackTrace) {
+      print('\n=== DATABASE QUERY ERROR ===');
+      print('SQL: $sql');
+      print('Parameters: $params');
+      print('Error: $e');
+      print('Stack trace:\n$stackTrace');
+      print('=== END DATABASE QUERY ERROR ===\n');
+      throw Exception('Database query failed: $e');
+    }
+  }
+
+  Future<void> execute(String sql, [List<dynamic>? params]) async {
+    try {
+      final conn = await connection;
+      await conn.query(sql, params);
+    } catch (e) {
+      print('Error executing statement: $e');
+      throw Exception('Database execute failed: $e');
+    }
+  }
+
+  // Update the constructor to use the singleton pattern
+  factory DatabaseService() {
+    return instance;
+  }
+
+  // for family status page
+  Future<List<Map<String, dynamic>>> getFamilyMembers(int userId) async {
+    try {
+      print('Fetching family members for user ID: $userId');
+      final sqlQuery = '''
+        SELECT 
+          fm.user_id,
+          fm.relationship,
+          b.status,  -- Fetching status from beds table
+          u.id,
+          u.name,
+          u.email,
+          u.profile_picture,
+          u.medical_condition
+        FROM family_members fm
+        JOIN users u ON fm.family_member_id = u.id
+        LEFT JOIN beds b ON b.patient_id = u.id  -- Joining with beds table
+        WHERE fm.user_id = ?
+        AND fm.deleted_at IS NULL
+      ''';
+      final results = await query(sqlQuery, [userId]);
+      print('Found ${results.length} family members for user ID: $userId');
+      return results;
+    } catch (e, stackTrace) {
+      print('Error fetching family members: $e');
+      print('Stack trace: $stackTrace');
+      return [];
     }
   }
 }
