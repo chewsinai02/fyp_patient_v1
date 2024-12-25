@@ -125,6 +125,7 @@ class FunctionPage extends StatelessWidget {
                             roomNumber: 101,
                             roomId: 1,
                             bedNumber: 1,
+                            bedId: 1,
                             floor: 1,
                             currentShift: 'morning',
                             assignedNurseId: 1,

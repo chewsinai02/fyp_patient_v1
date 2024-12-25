@@ -1037,23 +1037,34 @@ class DatabaseService {
       final conn = await connection;
       print('Fetching user data for ID: $userId');
 
-      // Join query to get all required information
-      final results = await conn.query('''
-        SELECT 
-          u.id,
-          u.name as patient_name,
-          b.id as bed_id,
-          b.bed_number,
-          b.room_id,
-          r.room_number,
-          r.floor,
-          ns.nurse_id,
-          ns.shift
-        FROM users u
-        JOIN beds b ON b.patient_id = u.id
-        JOIN rooms r ON b.room_id = r.id
+      // Get bed information
+      final bedResults = await conn.query('''
+        SELECT id, bed_number, room_id 
+        FROM beds 
+        WHERE patient_id = ?
+      ''', [userId]);
+
+      if (bedResults.isEmpty) {
+        throw Exception('No bed assigned to this patient');
+      }
+
+      // Get patient name
+      final userResults = await conn.query('''
+        SELECT name 
+        FROM users 
+        WHERE id = ?
+      ''', [userId]);
+
+      if (userResults.isEmpty) {
+        throw Exception('User not found');
+      }
+
+      // Get room information and nurse schedule
+      final roomResults = await conn.query('''
+        SELECT r.room_number, r.floor, ns.nurse_id, ns.shift
+        FROM rooms r
         LEFT JOIN nurse_schedules ns ON ns.room_id = r.id
-        WHERE u.id = ?
+        WHERE r.id = ?
         AND ns.date = CURDATE()
         AND ns.status = 'scheduled'
         AND (
@@ -1061,35 +1072,29 @@ class DatabaseService {
           (HOUR(NOW()) BETWEEN 15 AND 22 AND ns.shift = 'afternoon') OR
           ((HOUR(NOW()) >= 23 OR HOUR(NOW()) <= 6) AND ns.shift = 'night')
         )
-      ''', [userId]);
-
-      if (results.isEmpty) {
-        throw Exception('User not found');
-      }
+      ''', [bedResults.first['room_id']]);
 
       final userData = {
-        'patient_name': results.first['patient_name'],
-        'room_number': results.first['room_number'],
-        'bed_number': results.first['bed_number'],
-        'room_id': results.first['room_id'],
-        'floor': results.first['floor'],
-        'assigned_nurse_id': results.first['nurse_id'],
-        'current_shift': results.first['shift'],
+        'patient_name': userResults.first['name'] ?? 'Unknown Patient',
+        'bed_id': bedResults.first['id'] ?? 0,
+        'bed_number': bedResults.first['bed_number'] ?? 1,
+        'room_id': bedResults.first['room_id'] ?? 1,
+        'room_number': roomResults.isNotEmpty
+            ? roomResults.first['room_number'] ?? 101
+            : 101,
+        'floor': roomResults.isNotEmpty ? roomResults.first['floor'] ?? 1 : 1,
+        'assigned_nurse_id':
+            roomResults.isNotEmpty ? roomResults.first['nurse_id'] ?? 0 : 0,
+        'current_shift': roomResults.isNotEmpty
+            ? roomResults.first['shift'] ?? 'morning'
+            : 'morning',
       };
 
       print('Fetched user data: $userData');
       return userData;
     } catch (e) {
       print('Error fetching user data: $e');
-      return {
-        'patient_name': 'Unknown Patient',
-        'room_number': 101,
-        'bed_number': 1,
-        'room_id': 1,
-        'floor': 1,
-        'assigned_nurse_id': null,
-        'current_shift': null,
-      };
+      throw Exception('Failed to fetch user data: $e');
     }
   }
 
@@ -1245,5 +1250,22 @@ class DatabaseService {
       print('Error updating profile: $e');
       rethrow;
     }
+  }
+
+  Future<Map<String, dynamic>> getNurseSchedule({
+    required int roomId,
+    required String shift,
+  }) async {
+    final conn = await connection;
+    final result = await conn.query(
+      'SELECT nurse_id FROM nurse_schedules WHERE date = CURRENT_DATE AND shift = ? AND room_id = ?',
+      [shift, roomId],
+    );
+
+    if (result.isEmpty) {
+      throw Exception('No nurse assigned for this shift');
+    }
+
+    return result.first.fields;
   }
 }

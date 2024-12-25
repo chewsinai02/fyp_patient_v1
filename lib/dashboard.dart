@@ -281,6 +281,24 @@ class DashboardContent extends StatelessWidget {
                       final patientData =
                           await DatabaseService.instance.getUserById(userId);
 
+                      // Get current time and determine shift
+                      final now = DateTime.now();
+                      String currentShift;
+                      if (now.hour >= 7 && now.hour < 15) {
+                        currentShift = 'morning';
+                      } else if (now.hour >= 15 && now.hour < 23) {
+                        currentShift = 'afternoon';
+                      } else {
+                        currentShift = 'night';
+                      }
+
+                      // Fetch assigned nurse for current shift
+                      final nurseData =
+                          await DatabaseService.instance.getNurseSchedule(
+                        roomId: patientData['room_id'],
+                        shift: currentShift,
+                      );
+
                       if (context.mounted) {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -293,17 +311,19 @@ class DashboardContent extends StatelessWidget {
                               bedNumber: patientData['bed_number'] is String
                                   ? int.parse(patientData['bed_number'])
                                   : patientData['bed_number'],
+                              bedId: patientData['bed_id'] != null
+                                  ? (patientData['bed_id'] is String
+                                      ? int.parse(patientData['bed_id'])
+                                      : patientData['bed_id'])
+                                  : patientData['bed_number'],
                               roomId: patientData['room_id'] is String
                                   ? int.parse(patientData['room_id'])
                                   : patientData['room_id'],
                               floor: patientData['floor'] is String
                                   ? int.parse(patientData['floor'])
                                   : patientData['floor'],
-                              assignedNurseId: patientData['assigned_nurse_id']
-                                      is String
-                                  ? int.parse(patientData['assigned_nurse_id'])
-                                  : patientData['assigned_nurse_id'],
-                              currentShift: patientData['current_shift'],
+                              assignedNurseId: nurseData['nurse_id'],
+                              currentShift: currentShift,
                             ),
                           ),
                         );

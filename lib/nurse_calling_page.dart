@@ -10,6 +10,7 @@ class NurseCallingPage extends StatefulWidget {
     required this.patientName,
     required this.roomNumber,
     required this.bedNumber,
+    required this.bedId,
     required this.roomId,
     required this.floor,
     required this.assignedNurseId,
@@ -20,6 +21,7 @@ class NurseCallingPage extends StatefulWidget {
   final String patientName;
   final int roomNumber;
   final int bedNumber;
+  final int bedId;
   final int roomId;
   final int floor;
   final int? assignedNurseId;
@@ -63,6 +65,19 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
   }
 
   Future<void> _handleEmergencyCall(BuildContext context) async {
+    // Validate if there's an assigned nurse and current shift
+    if (widget.assignedNurseId == null || widget.currentShift == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No nurse is currently assigned to this room'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       // Request location permission
       LocationPermission permission = await Geolocator.checkPermission();
@@ -89,17 +104,18 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
           desiredAccuracy: LocationAccuracy.high,
         );
 
-        // Get new call ID
+        // Get new call ID with 'call_' prefix
         final callRef = _databaseRef.child('nurse_calls').push();
-        final callId = callRef.key;
+        final callId = 'call_${callRef.key}';
         _activeCallId = callId;
 
-        // Create emergency call data
+        // Create emergency call data with correct field values
         final callData = {
           'patient_id': widget.patientId,
           'assigned_nurse_id': widget.assignedNurseId,
           'attended_at': null,
           'attended_by': null,
+          'bed_id': widget.bedId,
           'bed_number': widget.bedNumber,
           'room_id': widget.roomId,
           'floor': widget.floor,
@@ -115,8 +131,8 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
           'timestamp': ServerValue.timestamp,
         };
 
-        // Push data to 'nurse_calls' node
-        await callRef.set(callData);
+        // Push data to 'nurse_calls' node with the call_ prefix
+        await _databaseRef.child('nurse_calls').child(callId).set(callData);
 
         // Hide loading indicator
         if (context.mounted) {
