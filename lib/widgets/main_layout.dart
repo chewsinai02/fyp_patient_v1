@@ -4,6 +4,7 @@ import '../appointment_page.dart';
 import '../pages/profile_page.dart';
 import '../services/auth_service.dart';
 import '../pages/messages_page.dart';
+import '../pages/doctors_page.dart';
 
 class MainLayout extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -22,12 +23,12 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _pages = [
-      DashboardContent(userData: widget.userData),
+      Dashboard(userData: widget.userData),
       MessagesPage(
         patientId: widget.userData['id'] ?? 0,
         isFromMainLayout: true,
       ),
-      const AppointmentPage(isFromMainLayout: true),
+      AppointmentPage(isFromMainLayout: true),
       ProfilePage(
         userData: widget.userData,
         isFromMainLayout: true,
@@ -47,7 +48,21 @@ class _MainLayoutState extends State<MainLayout> {
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
+        backgroundColor: Colors.grey[100],
         body: _pages[_selectedIndex],
+        floatingActionButton: _selectedIndex == 2
+            ? FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const DoctorsPage()),
+                  );
+                },
+                backgroundColor: Colors.deepPurple,
+                label: const Text('+', style: TextStyle(color: Colors.white)),
+              )
+            : null,
         bottomNavigationBar: Container(
           height: 65,
           decoration: BoxDecoration(

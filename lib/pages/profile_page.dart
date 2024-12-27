@@ -7,6 +7,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/storage_service.dart';
 import 'edit_profile_page.dart';
 import 'settings_page.dart';
+import '../utils/auth_utils.dart';
+import '../login.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -51,11 +53,27 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  void _logout() async {
+    await AuthUtils.logout();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => LoginPage()),
+      (Route<dynamic> route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: CustomScrollView(
+    return widget.isFromMainLayout
+        ? _buildContent()
+        : Scaffold(
+            body: _buildContent(),
+          );
+  }
+
+  Widget _buildContent() {
+    return Container(
+      color: Colors.white,
+      child: CustomScrollView(
         slivers: [
           _buildSliverAppBar(context),
           SliverToBoxAdapter(
@@ -189,6 +207,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     MaterialPageRoute(
                       builder: (context) => MessagesPage(
                         patientId: int.parse(_userData['id'].toString()),
+                        isFromMainLayout: false,
                       ),
                     ),
                   );
@@ -232,6 +251,7 @@ class _ProfilePageState extends State<ProfilePage> {
               MaterialPageRoute(
                 builder: (context) => MessagesPage(
                   patientId: int.parse(_userData['id'].toString()),
+                  isFromMainLayout: false,
                 ),
               ),
             );

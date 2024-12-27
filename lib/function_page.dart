@@ -114,8 +114,8 @@ class FunctionPage extends StatelessWidget {
           children: [
             Expanded(
               child: _buildFunctionCard(
-                title: 'Emergency',
-                icon: Icons.emergency_outlined,
+                title: 'Nurse Call',
+                icon: Icons.sos_outlined,
                 color: Colors.red,
                 onTap: () async {
                   try {
@@ -292,7 +292,10 @@ class FunctionPage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ProfilePage(userData: userData),
+                        builder: (context) => ProfilePage(
+                          userData: userData,
+                          isFromMainLayout: false,
+                        ),
                       ),
                     );
                   }

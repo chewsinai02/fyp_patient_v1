@@ -20,9 +20,17 @@ class MessagesPage extends StatefulWidget {
 class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: CustomScrollView(
+    return widget.isFromMainLayout
+        ? _buildContent()
+        : Scaffold(
+            body: _buildContent(),
+          );
+  }
+
+  Widget _buildContent() {
+    return Container(
+      color: Colors.white,
+      child: CustomScrollView(
         slivers: [
           // Modern Header
           SliverToBoxAdapter(
