@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/storage_service.dart';
 import 'edit_profile_page.dart';
+import 'settings_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -81,19 +82,13 @@ class _ProfilePageState extends State<ProfilePage> {
       actions: [
         _buildNotificationBadge(context),
         IconButton(
-          icon: const Icon(
-            Icons.settings_outlined,
-            color: Colors.white,
-          ),
-          onPressed: () async {
-            await Navigator.push(
+          icon: const Icon(Icons.settings),
+          color: Colors.white,
+          onPressed: () {
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => EditProfilePage(
-                  onProfileUpdated: () {
-                    _refreshUserData();
-                  },
-                ),
+                builder: (context) => const SettingsPage(),
               ),
             );
           },

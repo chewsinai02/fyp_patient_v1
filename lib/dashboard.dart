@@ -118,15 +118,12 @@ class _DashboardContentState extends State<DashboardContent> {
                                     color: Colors.white,
                                     size: 24,
                                   ),
-                                  onPressed: () async {
-                                    await Navigator.push(
+                                  onPressed: () {
+                                    Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => EditProfilePage(
-                                          onProfileUpdated: () {
-                                            _refreshUserData();
-                                          },
-                                        ),
+                                        builder: (context) =>
+                                            const SettingsPage(),
                                       ),
                                     );
                                   },

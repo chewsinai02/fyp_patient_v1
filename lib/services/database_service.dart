@@ -3,6 +3,10 @@ import 'package:dotenv/dotenv.dart';
 import 'package:intl/intl.dart';
 import '../models/message.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:bcrypt/bcrypt.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -70,12 +74,8 @@ class DatabaseService {
       print('Attempting login with email: $email');
       final conn = await connection;
 
-      // First, check if user exists
-      print('Executing user query...');
       final results =
           await conn.query('SELECT * FROM users WHERE email = ?', [email]);
-
-      print('Query results count: ${results.length}');
 
       if (results.isEmpty) {
         print('No user found with email: $email');
@@ -83,33 +83,38 @@ class DatabaseService {
       }
 
       final user = results.first;
+      final hashedPassword = user['password'] as String;
 
-      // For Laravel's password hash, we need to use the raw password
-      // Laravel will handle the hashing on their end
-      final storedPassword = user['password'];
+      print('Stored password from DB: $hashedPassword');
+      print('Input password: $password');
 
-      // For testing purposes, let's print the raw input
-      print('\nUser found:');
-      print('ID: ${user['id']}');
-      print('Name: ${user['name']}');
-      print('Email: ${user['email']}');
+      try {
+        // Remove the $2y prefix and replace with $2a for Dart's bcrypt
+        final normalizedHash = hashedPassword.replaceFirst('\$2y', '\$2a');
+        final isValid = BCrypt.checkpw(password, normalizedHash);
 
-      // Direct comparison with the raw password
-      // This assumes your Laravel API will handle the actual password verification
-      return {
-        'id': user['id'],
-        'name': user['name'],
-        'email': user['email'],
-        'gender': user['gender'],
-        'address': user['address'],
-        'phone': user['contact_number'],
-        'profile_picture': user['profile_picture'],
-      };
-    } catch (e, stackTrace) {
-      print('=== AUTHENTICATION ERROR ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      rethrow;
+        if (!isValid) {
+          print('Password verification failed');
+          return null;
+        }
+
+        print('Password verified successfully');
+        return {
+          'id': user['id'],
+          'name': user['name'],
+          'email': user['email'],
+          'gender': user['gender'],
+          'address': user['address'],
+          'phone': user['contact_number'],
+          'profile_picture': user['profile_picture'],
+        };
+      } catch (e) {
+        print('Error verifying password with bcrypt: $e');
+        return null;
+      }
+    } catch (e) {
+      print('Authentication error: $e');
+      return null;
     }
   }
 
@@ -1280,6 +1285,78 @@ class DatabaseService {
     } catch (e) {
       print('Error updating user profile: $e');
       throw e;
+    }
+  }
+
+  // change password
+  Future<bool> verifyPassword({
+    required int userId,
+    required String password,
+  }) async {
+    try {
+      final conn = await connection;
+      print('Verifying password for user ID: $userId');
+
+      final results = await conn.query('''
+        SELECT password 
+        FROM users 
+        WHERE id = ?
+      ''', [userId]);
+
+      if (results.isEmpty) {
+        print('No user found for ID: $userId');
+        return false;
+      }
+
+      final hashedPassword = results.first['password'] as String;
+      print('Stored hashed password: $hashedPassword');
+      print('Input password: $password');
+
+      // Use bcrypt to verify the password
+      try {
+        // Remove the $2y prefix and replace with $2a for Dart's bcrypt
+        final normalizedHash = hashedPassword.replaceFirst('\$2y', '\$2a');
+        final isValid = BCrypt.checkpw(password, normalizedHash);
+
+        print(isValid
+            ? 'Password verified successfully'
+            : 'Password verification failed');
+        return isValid;
+      } catch (e) {
+        print('Error verifying password with bcrypt: $e');
+        return false;
+      }
+    } catch (e) {
+      print('Error verifying password: $e');
+      return false;
+    }
+  }
+
+  Future<void> updatePassword({
+    required int userId,
+    required String newPassword,
+  }) async {
+    try {
+      final conn = await connection;
+      print('Updating password for user ID: $userId');
+
+      // Hash the new password using bcrypt
+      final salt = BCrypt.gensalt();
+      final hashedPassword = BCrypt.hashpw(newPassword, salt);
+      // Convert $2a to $2y to match PHP's bcrypt format
+      final phpCompatibleHash = hashedPassword.replaceFirst('\$2a', '\$2y');
+
+      await conn.query('''
+        UPDATE users 
+        SET password = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      ''', [phpCompatibleHash, userId]);
+
+      print('Password updated successfully');
+    } catch (e) {
+      print('Error updating password: $e');
+      throw Exception('Failed to update password: $e');
     }
   }
 }

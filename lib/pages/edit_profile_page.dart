@@ -137,33 +137,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  Future<String> _getSharePointToken() async {
-    try {
-      final response = await http.post(
-        Uri.parse(
-            'https://login.microsoftonline.com/fba1c813-1835-405e-8b4d-eb136933df57/oauth2/v2.0/token'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'client_id': 'e00dcac1-c783-49f9-bec5-37146c92f32b',
-          'client_secret': 'zxx8Q~_AdASYpf7woT1pCgilF~m4cWIJuGWVpddx',
-          'scope': 'https://graph.microsoft.com/.default',
-          'grant_type': 'client_credentials',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final tokenData = jsonDecode(response.body);
-        if (tokenData['access_token'] != null) {
-          return tokenData['access_token'];
-        }
-      }
-      throw Exception('Failed to get token: ${response.statusCode}');
-    } catch (e) {
-      print('Error getting token: $e');
-      throw Exception('Failed to get SharePoint token');
-    }
-  }
-
   Future<void> _uploadImage() async {
     if (_imageFile == null || _userId == null) return;
 
@@ -257,6 +230,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'You may edit your profile here',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
