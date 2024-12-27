@@ -2,14 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_service.dart';
 import 'messages_page.dart';
+import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../services/storage_service.dart';
+import 'edit_profile_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
+  const ProfilePage({super.key, required this.userData});
 
-  const ProfilePage({
-    super.key,
-    required this.userData,
-  });
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late Map<String, dynamic> _userData;
+
+  @override
+  void initState() {
+    super.initState();
+    _userData = widget.userData;
+    // Fetch fresh data when page loads
+    _refreshUserData();
+  }
+
+  Future<void> _refreshUserData() async {
+    try {
+      final results = await DatabaseService.instance.query(
+        'SELECT * FROM users WHERE id = ?',
+        [_userData['id']],
+      );
+
+      if (mounted && results.isNotEmpty) {
+        setState(() {
+          _userData = results.first;
+          print('ProfilePage - Fresh user data: $_userData');
+        });
+      }
+    } catch (e) {
+      print('Error refreshing user data: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +85,17 @@ class ProfilePage extends StatelessWidget {
             Icons.settings_outlined,
             color: Colors.white,
           ),
-          onPressed: () {
-            Navigator.of(context).pushNamed('/settings');
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EditProfilePage(
+                  onProfileUpdated: () {
+                    _refreshUserData();
+                  },
+                ),
+              ),
+            );
           },
         ),
         const SizedBox(width: 8),
@@ -77,19 +119,41 @@ class ProfilePage extends StatelessWidget {
                 CircleAvatar(
                   radius: 50,
                   backgroundColor: Colors.white,
-                  backgroundImage: userData['profile_picture'] != null &&
-                          userData['profile_picture']
-                              .toString()
-                              .startsWith('http')
-                      ? NetworkImage(userData['profile_picture'])
-                      : userData['profile_picture'] != null
-                          ? AssetImage('assets/${userData['profile_picture']}')
-                          : const AssetImage('assets/images/profile.png')
-                              as ImageProvider,
+                  backgroundImage:
+                      _userData['profile_picture']?.startsWith('images/') ==
+                              true
+                          ? AssetImage('assets/${_userData['profile_picture']}')
+                          : null,
+                  child: _userData['profile_picture']?.startsWith('images/') !=
+                          true
+                      ? FutureBuilder<String?>(
+                          future: StorageService()
+                              .getProfileImageUrl(_userData['profile_picture']),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData && snapshot.data != null) {
+                              return CircleAvatar(
+                                radius: 50,
+                                backgroundImage: CachedNetworkImageProvider(
+                                  snapshot.data!,
+                                  errorListener: (error) {
+                                    print(
+                                        'Error loading profile image: $error');
+                                  },
+                                ),
+                              );
+                            }
+                            return const CircleAvatar(
+                              radius: 50,
+                              backgroundImage:
+                                  AssetImage('assets/images/profile.png'),
+                            );
+                          },
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  userData['name'] ?? 'User',
+                  _userData['name'] ?? 'User',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -108,7 +172,7 @@ class ProfilePage extends StatelessWidget {
   Widget _buildNotificationBadge(BuildContext context) {
     return FutureBuilder<int>(
       future: DatabaseService.instance
-          .getUnreadMessageCount(int.parse(userData['id'].toString())),
+          .getUnreadMessageCount(int.parse(_userData['id'].toString())),
       builder: (context, snapshot) {
         if (snapshot.hasData && snapshot.data! > 0) {
           return Stack(
@@ -123,7 +187,7 @@ class ProfilePage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => MessagesPage(
-                        patientId: int.parse(userData['id'].toString()),
+                        patientId: int.parse(_userData['id'].toString()),
                       ),
                     ),
                   );
@@ -166,7 +230,7 @@ class ProfilePage extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => MessagesPage(
-                  patientId: int.parse(userData['id'].toString()),
+                  patientId: int.parse(_userData['id'].toString()),
                 ),
               ),
             );
@@ -177,46 +241,68 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildProfileInfo() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildInfoTile(
-            icon: Icons.email_outlined,
-            title: 'Email',
-            value: userData['email'] ?? 'Not provided',
-          ),
-          _buildDivider(),
-          _buildInfoTile(
-            icon: Icons.phone_outlined,
-            title: 'Phone',
-            value: userData['phone'] ?? 'Not provided',
-          ),
-          _buildDivider(),
-          _buildInfoTile(
-            icon: Icons.person_outline,
-            title: 'Gender',
-            value: userData['gender'] ?? 'Not provided',
-          ),
-          _buildDivider(),
-          _buildInfoTile(
-            icon: Icons.location_on_outlined,
-            title: 'Address',
-            value: userData['address'] ?? 'Not provided',
-          ),
-        ],
-      ),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: DatabaseService.instance.getUserProfile(_userData['id']),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          final userInfo = snapshot.data!;
+          print('=== USER INFO ===');
+          print('User ID: ${_userData['id']}');
+          print('Email: ${userInfo['email']}');
+          print('Phone: ${userInfo['contact_number']}');
+          print('Gender: ${userInfo['gender']}');
+          print('Address: ${userInfo['address']}');
+          print('Raw data: $userInfo');
+
+          return Container(
+            margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _buildInfoTile(
+                  icon: Icons.email_outlined,
+                  title: 'Email',
+                  value: userInfo['email'] ?? 'Not provided',
+                ),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.phone_outlined,
+                  title: 'Phone',
+                  value: userInfo['contact_number'] ?? 'Not provided',
+                ),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.person_outline,
+                  title: 'Gender',
+                  value: userInfo['gender'] ?? 'Not provided',
+                ),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.location_on_outlined,
+                  title: 'Address',
+                  value: userInfo['address'] ?? 'Not provided',
+                ),
+              ],
+            ),
+          );
+        }
+
+        return const Center(child: Text('No user data found'));
+      },
     );
   }
 

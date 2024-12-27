@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/database_service.dart';
 import '../widgets/message_input.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatPage extends StatefulWidget {
   final int patientId;
@@ -29,10 +30,10 @@ class _ChatPageState extends State<ChatPage> {
     print('Doctor ID: ${widget.otherUserId}');
     _messagesFuture = _loadMessages();
 
-    // Mark messages as read when chat is opened
-    DatabaseService.instance.markMessagesAsRead(
-      widget.otherUserId,
-      widget.patientId,
+    // Mark messages as read when entering chat
+    DatabaseService.instance.markMessageAsRead(
+      widget.otherUserId, // Doctor's ID (sender)
+      widget.patientId, // Current patient's ID (receiver)
     );
   }
 
@@ -348,33 +349,22 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              message.image ?? '',
-              width: 200, // Set a reasonable max width
+            child: CachedNetworkImage(
+              imageUrl: message.image ?? '',
+              width: 200,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  width: 200,
-                  height: 150,
-                  alignment: Alignment.center,
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                print('Error loading image: $error');
-                return Container(
-                  width: 200,
-                  height: 150,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.error),
-                );
-              },
+              placeholder: (context, url) => Container(
+                width: 200,
+                height: 150,
+                color: Colors.grey[300],
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              errorWidget: (context, url, error) => Container(
+                width: 200,
+                height: 150,
+                color: Colors.grey[300],
+                child: const Icon(Icons.error),
+              ),
             ),
           ),
         ],

@@ -40,60 +40,35 @@ class _MessageInputState extends State<MessageInput> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => WillPopScope(
-          onWillPop: () async => false,
-          child: const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Uploading image...',
-                    style: TextStyle(color: Colors.white)),
-              ],
-            ),
-          ),
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
         ),
       );
 
       try {
-        print('Preparing Firebase Storage reference...');
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('chat_images')
-            .child('image_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        // Set the destination path in Firebase Storage
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final destination = 'assets/chat_images/image_$timestamp.jpg';
 
-        print('Creating file object...');
+        final storageRef = FirebaseStorage.instance.ref().child(destination);
+
         final file = File(image.path);
         if (!await file.exists()) {
           throw Exception('File does not exist at path: ${image.path}');
         }
 
-        print('Starting file upload...');
-        final uploadTask = storageRef.putFile(
-          file,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-
-        // Monitor upload progress
-        uploadTask.snapshotEvents.listen(
-          (TaskSnapshot snapshot) {
-            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-            print('Upload progress: ${(progress * 100).toStringAsFixed(2)}%');
-          },
-          onError: (e) {
-            print('Upload stream error: $e');
+        // Upload with metadata
+        final metadata = SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {
+            'timestamp': timestamp.toString(),
+            'type': 'chat_image'
           },
         );
 
-        print('Waiting for upload to complete...');
-        await uploadTask;
-
-        print('Getting download URL...');
+        await storageRef.putFile(file, metadata);
         final imageUrl = await storageRef.getDownloadURL();
-        print('Download URL obtained: $imageUrl');
 
-        // Hide loading indicator and send message
         if (!context.mounted) return;
         Navigator.of(context, rootNavigator: true).pop();
 
@@ -103,35 +78,16 @@ class _MessageInputState extends State<MessageInput> {
           _textController.text.trim(),
         );
         _textController.clear();
-      } catch (e, stackTrace) {
-        print('Error during upload process:');
-        print('Error: $e');
-        print('Stack trace: $stackTrace');
-
+      } catch (e) {
+        print('Error uploading image: $e');
         if (!context.mounted) return;
         Navigator.of(context, rootNavigator: true).pop();
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
+          SnackBar(content: Text('Failed to upload image: $e')),
         );
       }
-    } catch (e, stackTrace) {
-      print('Error in image picker:');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to pick image: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    } catch (e) {
+      print('Error picking image: $e');
     }
   }
 

@@ -1,4 +1,6 @@
 import 'package:bcrypt/bcrypt.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'database_service.dart';
 
 class AuthService {
   static AuthService? _instance;
@@ -13,8 +15,11 @@ class AuthService {
 
   Map<String, dynamic>? get currentUser => _currentUser;
 
-  void setCurrentUser(Map<String, dynamic> userData) {
+  Future<void> setCurrentUser(Map<String, dynamic> userData) async {
     _currentUser = userData;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('user_id', userData['id']);
+    print('Saved user ID to SharedPreferences: ${userData['id']}');
   }
 
   static const String baseUrl = 'your_laravel_api_url';
@@ -74,5 +79,23 @@ class AuthService {
     print('Logging out user: $_currentUser');
     _currentUser = null;
     print('User after logout: $_currentUser');
+  }
+
+  Future<Map<String, dynamic>?> authenticateUser(
+      String email, String password) async {
+    try {
+      final userData =
+          await DatabaseService.instance.authenticateUser(email, password);
+      if (userData != null) {
+        // Save user ID to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('user_id', userData['id']);
+        print('Saved user ID to SharedPreferences: ${userData['id']}');
+      }
+      return userData;
+    } catch (e) {
+      print('Authentication error: $e');
+      return null;
+    }
   }
 }

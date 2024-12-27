@@ -9,6 +9,7 @@ import 'pages/settings_page.dart';
 import 'pages/doctors_page.dart';
 import 'services/auth_service.dart';
 import 'pages/messages_page.dart';
+import 'services/database_service.dart';
 
 class FunctionPage extends StatelessWidget {
   const FunctionPage({super.key});
@@ -116,21 +117,97 @@ class FunctionPage extends StatelessWidget {
                 title: 'Emergency',
                 icon: Icons.emergency_outlined,
                 color: Colors.red,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const NurseCallingPage(
-                            patientId: 1,
-                            patientName: 'John Doe',
-                            roomNumber: 101,
-                            roomId: 1,
-                            bedNumber: 1,
-                            bedId: 1,
-                            floor: 1,
-                            currentShift: 'morning',
-                            assignedNurseId: 1,
-                          )),
-                ),
+                onTap: () async {
+                  try {
+                    // Show loading indicator
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+
+                    // Get current user data
+                    final userData = AuthService.instance.currentUser;
+                    if (userData == null) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Remove loading indicator
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('User data not found')),
+                        );
+                      }
+                      return;
+                    }
+
+                    // Fetch user data based on patient ID
+                    final userId = int.parse(userData['id'].toString());
+                    final patientData =
+                        await DatabaseService.instance.getUserById(userId);
+
+                    if (patientData == null) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Remove loading indicator
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Unable to fetch patient data')),
+                        );
+                      }
+                      return;
+                    }
+
+                    // Get current time and determine shift
+                    final now = DateTime.now();
+                    String currentShift;
+                    if (now.hour >= 7 && now.hour < 15) {
+                      currentShift = 'morning';
+                    } else if (now.hour >= 15 && now.hour < 23) {
+                      currentShift = 'afternoon';
+                    } else {
+                      currentShift = 'night';
+                    }
+
+                    // Fetch assigned nurse for current shift
+                    final nurseData =
+                        await DatabaseService.instance.getNurseSchedule(
+                      roomId: patientData['room_id'],
+                      shift: currentShift,
+                    );
+
+                    if (context.mounted) {
+                      Navigator.pop(context); // Remove loading indicator
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NurseCallingPage(
+                            patientId: userId,
+                            patientName: patientData['patient_name'] ??
+                                patientData['name'] ??
+                                userData['name'] ??
+                                'Unknown Patient',
+                            roomNumber: patientData['room_number'] ?? 0,
+                            bedNumber: patientData['bed_number'] ?? 0,
+                            bedId: patientData['bed_id'] ??
+                                patientData['bed_number'] ??
+                                0,
+                            roomId: patientData['room_id'] ?? 0,
+                            floor: patientData['floor'] ?? 0,
+                            assignedNurseId: nurseData?['nurse_id'] ?? 0,
+                            currentShift: currentShift,
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      Navigator.pop(context); // Remove loading indicator
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: ${e.toString()}')),
+                      );
+                    }
+                    print('Error navigating to nurse call: $e');
+                  }
+                },
               ),
             ),
             const SizedBox(width: 16),

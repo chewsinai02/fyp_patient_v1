@@ -7,6 +7,9 @@ import 'pages/daily_tasks_page.dart';
 import 'services/database_service.dart';
 import 'pages/messages_page.dart';
 import 'pages/settings_page.dart';
+import 'services/storage_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'pages/edit_profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -27,9 +30,42 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 // Extract the current dashboard content into a separate widget
-class DashboardContent extends StatelessWidget {
+class DashboardContent extends StatefulWidget {
   final Map<String, dynamic> userData;
   const DashboardContent({super.key, required this.userData});
+
+  @override
+  State<DashboardContent> createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends State<DashboardContent> {
+  late Map<String, dynamic> _userData;
+
+  @override
+  void initState() {
+    super.initState();
+    _userData = widget.userData;
+    // Fetch fresh data when dashboard loads
+    _refreshUserData();
+  }
+
+  Future<void> _refreshUserData() async {
+    try {
+      final results = await DatabaseService.instance.query(
+        'SELECT * FROM users WHERE id = ?',
+        [_userData['id']],
+      );
+
+      if (mounted && results.isNotEmpty) {
+        setState(() {
+          _userData = results.first;
+          print('Dashboard - Fresh user data: $_userData');
+        });
+      }
+    } catch (e) {
+      print('Error refreshing user data: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,12 +118,15 @@ class DashboardContent extends StatelessWidget {
                                     color: Colors.white,
                                     size: 24,
                                   ),
-                                  onPressed: () {
-                                    Navigator.push(
+                                  onPressed: () async {
+                                    await Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) =>
-                                            const SettingsPage(),
+                                        builder: (context) => EditProfilePage(
+                                          onProfileUpdated: () {
+                                            _refreshUserData();
+                                          },
+                                        ),
                                       ),
                                     );
                                   },
@@ -113,14 +152,42 @@ class DashboardContent extends StatelessWidget {
                               child: CircleAvatar(
                                 radius: 22,
                                 backgroundColor: Colors.white,
-                                backgroundImage: userData[
-                                            'assets/' 'profile_picture'] !=
-                                        null
-                                    ? NetworkImage(
-                                        userData['assets/' 'profile_picture'])
-                                    : const AssetImage(
-                                            'assets/images/profile.png')
-                                        as ImageProvider,
+                                backgroundImage: _userData['profile_picture']
+                                            ?.startsWith('images/') ==
+                                        true
+                                    ? AssetImage(
+                                        'assets/${_userData['profile_picture']}')
+                                    : null,
+                                child: _userData['profile_picture']
+                                            ?.startsWith('images/') !=
+                                        true
+                                    ? FutureBuilder<String?>(
+                                        future: StorageService()
+                                            .getProfileImageUrl(
+                                                _userData['profile_picture']),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasData &&
+                                              snapshot.data != null) {
+                                            return CircleAvatar(
+                                              radius: 22,
+                                              backgroundImage:
+                                                  CachedNetworkImageProvider(
+                                                snapshot.data!,
+                                                errorListener: (error) {
+                                                  print(
+                                                      'Error loading profile image: $error');
+                                                },
+                                              ),
+                                            );
+                                          }
+                                          return const CircleAvatar(
+                                            radius: 22,
+                                            backgroundImage: AssetImage(
+                                                'assets/images/profile.png'),
+                                          );
+                                        },
+                                      )
+                                    : null,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -136,7 +203,7 @@ class DashboardContent extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  userData['name'] ?? 'User',
+                                  _userData['name'] ?? 'User',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
@@ -161,7 +228,7 @@ class DashboardContent extends StatelessWidget {
               padding: const EdgeInsets.all(16.0),
               child: FutureBuilder<Map<String, dynamic>>(
                 future: DatabaseService.instance
-                    .getTasksProgress(int.parse(userData['id'].toString())),
+                    .getTasksProgress(int.parse(_userData['id'].toString())),
                 builder: (context, snapshot) {
                   print('FutureBuilder state:');
                   print('Has data: ${snapshot.hasData}');
@@ -196,8 +263,8 @@ class DashboardContent extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (context) => DailyTasksPage(
-                            patientId: int.parse(userData['id'].toString()),
-                            patientName: userData['name'],
+                            patientId: int.parse(_userData['id'].toString()),
+                            patientName: _userData['name'],
                           ),
                         ),
                       );
@@ -276,10 +343,30 @@ class DashboardContent extends StatelessWidget {
                   iconColor: Colors.red,
                   onTap: () async {
                     try {
+                      // Show loading indicator
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+
                       // Fetch user data based on patient ID
-                      final userId = int.parse(userData['id'].toString());
+                      final userId = int.parse(_userData['id'].toString());
                       final patientData =
                           await DatabaseService.instance.getUserById(userId);
+
+                      if (patientData == null) {
+                        if (context.mounted) {
+                          Navigator.pop(context); // Remove loading indicator
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Unable to fetch patient data')),
+                          );
+                        }
+                        return;
+                      }
 
                       // Get current time and determine shift
                       final now = DateTime.now();
@@ -300,37 +387,37 @@ class DashboardContent extends StatelessWidget {
                       );
 
                       if (context.mounted) {
-                        Navigator.of(context).push(
+                        Navigator.pop(context); // Remove loading indicator
+                        Navigator.push(
+                          context,
                           MaterialPageRoute(
                             builder: (context) => NurseCallingPage(
                               patientId: userId,
-                              patientName: patientData['patient_name'],
-                              roomNumber: patientData['room_number'] is String
-                                  ? int.parse(patientData['room_number'])
-                                  : patientData['room_number'],
-                              bedNumber: patientData['bed_number'] is String
-                                  ? int.parse(patientData['bed_number'])
-                                  : patientData['bed_number'],
-                              bedId: patientData['bed_id'] != null
-                                  ? (patientData['bed_id'] is String
-                                      ? int.parse(patientData['bed_id'])
-                                      : patientData['bed_id'])
-                                  : patientData['bed_number'],
-                              roomId: patientData['room_id'] is String
-                                  ? int.parse(patientData['room_id'])
-                                  : patientData['room_id'],
-                              floor: patientData['floor'] is String
-                                  ? int.parse(patientData['floor'])
-                                  : patientData['floor'],
-                              assignedNurseId: nurseData['nurse_id'],
+                              patientName: patientData['patient_name'] ??
+                                  patientData['name'] ??
+                                  _userData['name'] ??
+                                  'Unknown Patient',
+                              roomNumber: patientData['room_number'] ?? 0,
+                              bedNumber: patientData['bed_number'] ?? 0,
+                              bedId: patientData['bed_id'] ??
+                                  patientData['bed_number'] ??
+                                  0,
+                              roomId: patientData['room_id'] ?? 0,
+                              floor: patientData['floor'] ?? 0,
+                              assignedNurseId: nurseData?['nurse_id'] ?? 0,
                               currentShift: currentShift,
                             ),
                           ),
                         );
                       }
                     } catch (e) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Remove loading indicator
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: ${e.toString()}')),
+                        );
+                      }
                       print('Error navigating to nurse call: $e');
-                      // Handle error appropriately
                     }
                   },
                 ),
@@ -442,7 +529,7 @@ class DashboardContent extends StatelessWidget {
 
   Widget _buildNotificationBadge() {
     return FutureBuilder<int>(
-      future: DatabaseService.instance.getUnreadMessageCount(userData['id']),
+      future: DatabaseService.instance.getUnreadMessageCount(_userData['id']),
       builder: (context, snapshot) {
         if (snapshot.hasData && snapshot.data! > 0) {
           return Stack(
@@ -460,7 +547,7 @@ class DashboardContent extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => MessagesPage(
-                        patientId: int.parse(userData['id'].toString()),
+                        patientId: int.parse(_userData['id'].toString()),
                       ),
                     ),
                   );
@@ -501,7 +588,7 @@ class DashboardContent extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => MessagesPage(
-                  patientId: int.parse(userData['id'].toString()),
+                  patientId: int.parse(_userData['id'].toString()),
                 ),
               ),
             );
@@ -509,5 +596,12 @@ class DashboardContent extends StatelessWidget {
         );
       },
     );
+  }
+
+  int? _parseIntSafely(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }

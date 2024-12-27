@@ -7,37 +7,43 @@ import 'firebase_options.dart';
 import 'login.dart';
 import 'pages/settings_page.dart';
 import 'pages/edit_profile_page.dart';
+import 'services/storage_service.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:typed_data';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
-    print('Initializing Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('Firebase initialized successfully');
+    print("Firebase initialized successfully");
 
-    // Test Firebase Storage
+    // Initialize App Check first
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+    );
+    print("App Check activated");
+
+    // Initialize anonymous auth
+    final auth = FirebaseAuth.instance;
+    if (auth.currentUser == null) {
+      await auth.signInAnonymously();
+      print("Signed in anonymously");
+    }
+
+    final storageService = StorageService();
+    await storageService.initializeAppCheck();
+
+    // Test storage connection
     final storage = FirebaseStorage.instance;
-    print('Firebase Storage instance created: ${storage.bucket}');
-
-    // Initialize Firebase Database
-    final database = FirebaseDatabase.instance;
-    database.setPersistenceEnabled(true); // Enable offline persistence
-    print('Firebase Database initialized');
-  } catch (e, stackTrace) {
-    print('Error initializing Firebase:');
-    print('Error: $e');
-    print('Stack trace: $stackTrace');
+    final listResult = await storage.ref().listAll();
+    print("Firebase Storage connected successfully");
+    print("Number of items in storage: ${listResult.items.length}");
+  } catch (e) {
+    print("Firebase initialization error: $e");
   }
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ),
-  );
   runApp(const MyApp());
 }
 

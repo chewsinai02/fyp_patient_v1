@@ -3,10 +3,15 @@ import '../models/message.dart';
 import '../services/database_service.dart';
 import 'chat_page.dart';
 
-class MessagesPage extends StatelessWidget {
+class MessagesPage extends StatefulWidget {
   final int patientId;
   const MessagesPage({super.key, required this.patientId});
 
+  @override
+  State<MessagesPage> createState() => _MessagesPageState();
+}
+
+class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,7 +33,7 @@ class MessagesPage extends StatelessWidget {
         ),
       ),
       body: FutureBuilder<List<Message>>(
-        future: DatabaseService.instance.getLatestMessages(patientId),
+        future: DatabaseService.instance.getLatestMessages(widget.patientId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -85,7 +90,7 @@ class MessagesPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemBuilder: (context, index) {
               final message = messages[index];
-              final doctorId = message.senderId == patientId
+              final doctorId = message.senderId == widget.patientId
                   ? message.receiverId
                   : message.senderId;
 
@@ -95,28 +100,57 @@ class MessagesPage extends StatelessWidget {
                   horizontal: 16,
                   vertical: 4,
                 ),
-                color: Colors.white,
+                color: message.unreadCount > 0 &&
+                        message.receiverId == widget.patientId
+                    ? Colors.blue.shade50
+                    : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                    color: Colors.grey.withOpacity(0.1),
-                    width: 1,
+                    color: message.unreadCount > 0 &&
+                            message.receiverId == widget.patientId
+                        ? Colors.blue
+                        : Colors.grey.withOpacity(0.1),
+                    width: message.unreadCount > 0 &&
+                            message.receiverId == widget.patientId
+                        ? 2
+                        : 1,
                   ),
                 ),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatPage(
-                          patientId: patientId,
-                          otherUserId: doctorId,
+                  onTap: () async {
+                    try {
+                      // Mark messages as read if there are unread messages
+                      if (message.unreadCount > 0 &&
+                          message.receiverId == widget.patientId) {
+                        await DatabaseService.instance.markMessageAsRead(
+                          message.senderId, // Doctor's ID (sender)
+                          widget.patientId, // Current patient's ID (receiver)
+                        );
+
+                        // Refresh the messages list immediately
+                        setState(() {});
+                      }
+
+                      // Then navigate to chat
+                      if (!mounted) return;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatPage(
+                            patientId: widget.patientId,
+                            otherUserId: doctorId,
+                          ),
                         ),
-                      ),
-                    );
+                      ).then((_) {
+                        setState(() {}); // Refresh again when returning
+                      });
+                    } catch (e) {
+                      print('Error updating message status: $e');
+                    }
                   },
-                  child: Padding(
+                  child: Container(
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
@@ -124,7 +158,8 @@ class MessagesPage extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 28,
-                              backgroundImage: message.senderId == patientId
+                              backgroundImage: message.senderId ==
+                                      widget.patientId
                                   ? (message.receiverProfilePicture != null
                                       ? AssetImage(
                                           message.receiverProfilePicture!)
@@ -167,19 +202,37 @@ class MessagesPage extends StatelessWidget {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    message.senderId == patientId
+                                    message.senderId == widget.patientId
                                         ? message.receiverName ?? 'Unknown'
                                         : message.senderName ?? 'Unknown',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                                    style: TextStyle(
+                                      fontWeight: message.unreadCount > 0 &&
+                                              message.receiverId ==
+                                                  widget.patientId
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                       fontSize: 16,
+                                      color: message.unreadCount > 0 &&
+                                              message.receiverId ==
+                                                  widget.patientId
+                                          ? Colors.blue
+                                          : Colors.black87,
                                     ),
                                   ),
                                   Text(
                                     formatTime(message.createdAt),
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey[600],
+                                      fontWeight: message.unreadCount > 0 &&
+                                              message.receiverId ==
+                                                  widget.patientId
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: message.unreadCount > 0 &&
+                                              message.receiverId ==
+                                                  widget.patientId
+                                          ? Colors.blue
+                                          : Colors.grey[600],
                                     ),
                                   ),
                                 ],
@@ -193,14 +246,21 @@ class MessagesPage extends StatelessWidget {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: Colors.grey[600],
+                                        color: message.unreadCount > 0 &&
+                                                message.receiverId ==
+                                                    widget.patientId
+                                            ? Colors.black87
+                                            : Colors.grey[600],
+                                        fontWeight: message.unreadCount > 0 &&
+                                                message.receiverId ==
+                                                    widget.patientId
+                                            ? FontWeight.w500
+                                            : FontWeight.normal,
                                         fontSize: 14,
                                       ),
                                     ),
                                   ),
-                                  if (!message.isRead &&
-                                      message.senderId != patientId) ...[
-                                    const SizedBox(width: 8),
+                                  if (message.unreadCount > 0) ...[
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
@@ -210,11 +270,11 @@ class MessagesPage extends StatelessWidget {
                                         color: Colors.deepPurple,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: const Text(
-                                        'NEW',
-                                        style: TextStyle(
+                                      child: Text(
+                                        message.unreadCount.toString(),
+                                        style: const TextStyle(
                                           color: Colors.white,
-                                          fontSize: 10,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),

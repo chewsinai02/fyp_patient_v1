@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/database_service.dart';
 import 'pages/main_layout.dart';
 import 'services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -190,11 +191,9 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // Set the user data in AuthService after successful authentication
-      AuthService.instance.setCurrentUser(user);
-      final currentUser = AuthService.instance.getCurrentUserId();
-      print('Verified login - Current user: $currentUser');
+      await AuthService.instance.setCurrentUser(user);
+      print('User data set, ID: ${user['id']}');
 
-      print('Authentication successful - navigating to dashboard');
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -203,6 +202,11 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       }
+
+      // After successful login
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
+      print('Verified user ID in SharedPreferences: $userId');
     } catch (e) {
       print('Login error: $e');
       setState(() {

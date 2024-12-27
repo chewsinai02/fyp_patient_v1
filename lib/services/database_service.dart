@@ -1,14 +1,16 @@
-import 'package:mysql1/mysql1.dart';
+import 'package:mysql1/mysql1.dart' as mysql;
 import 'package:dotenv/dotenv.dart';
 import 'package:intl/intl.dart';
 import '../models/message.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
-  MySqlConnection? _conn;
+  mysql.MySqlConnection? _conn;
   bool _isConnecting = false;
   static const int _maxConnections = 5;
   static int _currentConnections = 0;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   DatabaseService._();
 
@@ -17,7 +19,7 @@ class DatabaseService {
     return _instance!;
   }
 
-  Future<MySqlConnection> get connection async {
+  Future<mysql.MySqlConnection> get connection async {
     if (_conn != null) {
       return _conn!;
     }
@@ -36,7 +38,7 @@ class DatabaseService {
       _isConnecting = true;
       _currentConnections++;
 
-      final settings = ConnectionSettings(
+      final settings = mysql.ConnectionSettings(
         host: 'mydb.cdsagqe648ba.ap-southeast-2.rds.amazonaws.com',
         port: 3306,
         user: 'admin',
@@ -45,7 +47,7 @@ class DatabaseService {
         timeout: Duration(seconds: 30),
       );
 
-      _conn = await MySqlConnection.connect(settings);
+      _conn = await mysql.MySqlConnection.connect(settings);
       return _conn!;
     } finally {
       _isConnecting = false;
@@ -250,7 +252,7 @@ class DatabaseService {
 
         String convertToString(dynamic value) {
           if (value == null) return '';
-          if (value is Blob) {
+          if (value is mysql.Blob) {
             return String.fromCharCodes(value.toBytes());
           }
           return value.toString();
@@ -310,8 +312,8 @@ class DatabaseService {
         String specialty = 'General Practice';
         try {
           if (row['description'] != null) {
-            if (row['description'] is Blob) {
-              final blob = row['description'] as Blob;
+            if (row['description'] is mysql.Blob) {
+              final blob = row['description'] as mysql.Blob;
               specialty = String.fromCharCodes(blob.toString().codeUnits);
             } else {
               specialty = row['description'].toString();
@@ -523,6 +525,39 @@ class DatabaseService {
     }
   }
 
+  //check unread messages
+  Future<int> checkUnreadMessages(int patientId) async {
+    final conn = await connection;
+    final result = await conn.query(
+        'SELECT COUNT(*) FROM messages WHERE receiver_id = ? AND is_read = 1',
+        [patientId]);
+    return result.first['COUNT(*)'] as int;
+  }
+
+  //mark message as read
+  Future<void> markMessageAsRead(int senderId, int receiverId) async {
+    try {
+      final conn = await connection;
+      print(
+          'Marking messages as read - From Doctor: $senderId, To Patient: $receiverId');
+
+      // Update all unread messages from this sender to this receiver
+      final result = await conn.query('''
+        UPDATE messages 
+        SET is_read = 0,
+            updated_at = NOW() 
+        WHERE sender_id = ?  -- Doctor's ID
+          AND receiver_id = ?  -- Patient's ID
+          AND is_read = 1
+      ''', [senderId, receiverId]);
+
+      print('Messages marked as read. Rows affected: ${result.affectedRows}');
+    } catch (e) {
+      print('Error marking messages as read: $e');
+      rethrow;
+    }
+  }
+
   // Add this method to DatabaseService class
   Future<List<Map<String, dynamic>>> getAppointments(int patientId) async {
     try {
@@ -609,19 +644,22 @@ class DatabaseService {
   Future<List<Message>> getLatestMessages(int patientId) async {
     try {
       final conn = await connection;
-      print('Fetching latest messages for patient ID: $patientId');
+      print('Fetching latest messages for patient: $patientId');
 
-      // Modified query to get latest message with each doctor
+      // Updated query to count unread messages (is_read=1)
       final results = await conn.query('''
         WITH RankedMessages AS (
           SELECT 
             m.*,
             u_sender.name as sender_name,
             u_sender.profile_picture as sender_profile_picture,
-            u_sender.role as sender_role,
             u_receiver.name as receiver_name,
             u_receiver.profile_picture as receiver_profile_picture,
-            u_receiver.role as receiver_role,
+            (SELECT COUNT(*) 
+             FROM messages m2 
+             WHERE m2.sender_id = m.sender_id 
+             AND m2.receiver_id = ? 
+             AND m2.is_read = 1) as unread_count,
             ROW_NUMBER() OVER (
               PARTITION BY 
                 CASE 
@@ -633,43 +671,40 @@ class DatabaseService {
           FROM messages m
           JOIN users u_sender ON m.sender_id = u_sender.id
           JOIN users u_receiver ON m.receiver_id = u_receiver.id
-          WHERE (m.sender_id = ? OR m.receiver_id = ?)
-            AND (u_sender.role = 'doctor' OR u_receiver.role = 'doctor')
+          WHERE m.sender_id = ? OR m.receiver_id = ?
         )
         SELECT * FROM RankedMessages 
         WHERE rn = 1
-        ORDER BY created_at DESC
-      ''', [patientId, patientId, patientId]);
-
-      print('Found ${results.length} conversations');
+        ORDER BY unread_count DESC, created_at DESC
+      ''', [patientId, patientId, patientId, patientId]);
 
       return results.map((row) {
-        String messageText = row['message'] is Blob
-            ? String.fromCharCodes((row['message'] as Blob).toBytes())
-            : row['message'].toString();
+        String messageText = row['message'] is mysql.Blob
+            ? String.fromCharCodes((row['message'] as mysql.Blob).toBytes())
+            : row['message']?.toString() ?? '';
+
+        final unreadCount = row['unread_count'] as int;
+        print('Conversation unread count: $unreadCount'); // Debug print
 
         return Message.fromMap({
           'id': row['id'],
           'sender_id': row['sender_id'],
           'receiver_id': row['receiver_id'],
           'message': messageText,
-          'image': row['image'] != null ? 'assets/${row['image']}' : null,
+          'image': row['image'],
           'created_at': row['created_at'].toString(),
           'updated_at': row['updated_at'].toString(),
-          'is_read': row['is_read'],
+          'is_read': row['is_read'] ?? false,
+          'unread_count': unreadCount,
           'sender_name': row['sender_name'],
-          'sender_profile_picture': row['sender_profile_picture'] != null
-              ? 'assets/${row['sender_profile_picture']}'
-              : 'assets/images/doctor_placeholder.png',
+          'sender_profile_picture': row['sender_profile_picture'],
           'receiver_name': row['receiver_name'],
-          'receiver_profile_picture': row['receiver_profile_picture'] != null
-              ? 'assets/${row['receiver_profile_picture']}'
-              : 'assets/images/doctor_placeholder.png',
+          'receiver_profile_picture': row['receiver_profile_picture'],
+          'message_type': row['image'] != null ? 'image' : 'text',
         });
       }).toList();
     } catch (e) {
       print('Error fetching latest messages: $e');
-      print('Stack trace: ${StackTrace.current}');
       return [];
     }
   }
@@ -678,120 +713,53 @@ class DatabaseService {
       int userId1, int userId2) async {
     try {
       final conn = await connection;
-      print('=== FETCHING MESSAGES BETWEEN USERS ===');
-      print('User 1 ID: $userId1');
-      print('User 2 ID: $userId2');
+      print('=== FETCHING MESSAGES ===');
+      print('Between users: $userId1 and $userId2');
 
-      // First verify if both users exist and at least one is a doctor
-      const userCheckQuery = '''
-        SELECT id, name, role FROM users 
-        WHERE id IN (?, ?) AND (role = 'doctor' OR role = 'patient')
+      const query = '''
+        SELECT 
+          m.*,
+          s.name as sender_name,
+          s.profile_picture as sender_profile_picture,
+          r.name as receiver_name,
+          r.profile_picture as receiver_profile_picture
+        FROM messages m
+        JOIN users s ON m.sender_id = s.id
+        JOIN users r ON m.receiver_id = r.id
+        WHERE (m.sender_id = ? AND m.receiver_id = ?)
+           OR (m.sender_id = ? AND m.receiver_id = ?)
+        ORDER BY m.created_at ASC
       ''';
 
-      final userResults = await conn.query(userCheckQuery, [userId1, userId2]);
-      print('Found ${userResults.length} users:');
-      for (var user in userResults) {
-        print(
-            'User ID: ${user['id']}, Name: ${user['name']}, Role: ${user['role']}');
-      }
-
-      if (userResults.length != 2) {
-        print('Error: Could not find both users or invalid user roles');
-        return [];
-      }
-
-      // Then get the messages with role verification
-      final results = await conn.query('''
-        SELECT 
-          m.id,
-          m.sender_id,
-          m.receiver_id,
-          CAST(m.message AS CHAR) as message,
-          m.image,
-          m.created_at,
-          m.updated_at,
-          m.is_read,
-          sender.name as sender_name,
-          sender.profile_picture as sender_profile_picture,
-          sender.role as sender_role,
-          receiver.name as receiver_name,
-          receiver.profile_picture as receiver_profile_picture,
-          receiver.role as receiver_role
-        FROM messages m
-        JOIN users sender ON m.sender_id = sender.id
-        JOIN users receiver ON m.receiver_id = receiver.id
-        WHERE ((m.sender_id = ? AND m.receiver_id = ?) 
-           OR (m.sender_id = ? AND m.receiver_id = ?))
-        AND (
-          (sender.role = 'doctor' AND receiver.role = 'patient')
-          OR 
-          (sender.role = 'patient' AND receiver.role = 'doctor')
-        )
-        ORDER BY m.created_at ASC
-      ''', [userId1, userId2, userId2, userId1]);
-
-      print('Found ${results.length} messages between users');
-
-      if (results.isEmpty) {
-        print('No messages found between these users');
-        // Check if there are any messages at all for either user
-        final checkMessages = await conn.query('''
-          SELECT DISTINCT m.sender_id, m.receiver_id 
-          FROM messages m
-          JOIN users sender ON m.sender_id = sender.id
-          JOIN users receiver ON m.receiver_id = receiver.id
-          WHERE (m.sender_id IN (?, ?) OR m.receiver_id IN (?, ?))
-          AND (
-            (sender.role = 'doctor' AND receiver.role = 'patient')
-            OR 
-            (sender.role = 'patient' AND receiver.role = 'doctor')
-          )
-        ''', [userId1, userId2, userId1, userId2]);
-
-        print(
-            'Total message relationships for these users: ${checkMessages.length}');
-        for (var msg in checkMessages) {
-          print(
-              'Message relationship: ${msg['sender_id']} -> ${msg['receiver_id']}');
-        }
-      }
+      final results =
+          await conn.query(query, [userId1, userId2, userId2, userId1]);
+      print('Found ${results.length} messages');
 
       final messages = results.map((row) {
-        // Convert Blob to String if necessary
-        String messageText = row['message'] is Blob
-            ? String.fromCharCodes((row['message'] as Blob).toBytes())
-            : row['message'].toString();
-
-        print(
-            'Processing message: ID=${row['id']}, Sender=${row['sender_id']}, Receiver=${row['receiver_id']}');
+        String messageText = row['message'] is mysql.Blob
+            ? String.fromCharCodes((row['message'] as mysql.Blob).toBytes())
+            : row['message']?.toString() ?? '';
 
         return Message.fromMap({
           'id': row['id'],
           'sender_id': row['sender_id'],
           'receiver_id': row['receiver_id'],
           'message': messageText,
-          'image': row['image'] != null ? 'assets/${row['image']}' : null,
+          'image': row['image'],
           'created_at': row['created_at'].toString(),
           'updated_at': row['updated_at'].toString(),
           'is_read': row['is_read'] ?? false,
           'sender_name': row['sender_name'],
-          'sender_profile_picture': row['sender_profile_picture'] != null
-              ? 'assets/${row['sender_profile_picture']}'
-              : 'assets/images/doctor_placeholder.png',
+          'sender_profile_picture': row['sender_profile_picture'],
           'receiver_name': row['receiver_name'],
-          'receiver_profile_picture': row['receiver_profile_picture'] != null
-              ? 'assets/${row['receiver_profile_picture']}'
-              : 'assets/images/doctor_placeholder.png',
+          'receiver_profile_picture': row['receiver_profile_picture'],
+          'message_type': row['image'] != null ? 'image' : 'text',
         });
       }).toList();
 
-      print('Successfully processed ${messages.length} messages');
-      print('=== END FETCHING MESSAGES ===');
       return messages;
-    } catch (e, stackTrace) {
-      print('=== ERROR FETCHING MESSAGES ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      print('Error fetching messages: $e');
       return [];
     }
   }
@@ -805,11 +773,23 @@ class DatabaseService {
   }) async {
     try {
       final conn = await connection;
-      print('Sending message from $senderId to $receiverId');
-      print('Message type: $messageType');
+      print('Sending message:');
+      print('From: $senderId');
+      print('To: $receiverId');
+      print('Type: $messageType');
       print('Image URL: $image');
 
+      // Don't modify Firebase Storage URLs
+      final imageToStore = image != null &&
+              image.startsWith('https://firebasestorage.googleapis.com')
+          ? image
+          : image != null
+              ? 'assets/$image'
+              : null;
+
       final timestamp = DateTime.now().toUtc().toString();
+
+      // Remove message_type from the query until column is added
       await conn.query('''
         INSERT INTO messages (
           sender_id, 
@@ -818,17 +798,15 @@ class DatabaseService {
           image, 
           created_at, 
           updated_at, 
-          is_read,
-          message_type
-        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+          is_read
+        ) VALUES (?, ?, ?, ?, ?, ?, 0)
       ''', [
         senderId,
         receiverId,
         message,
-        image,
+        imageToStore,
         timestamp,
         timestamp,
-        messageType
       ]);
 
       print('Message sent successfully');
@@ -982,7 +960,7 @@ class DatabaseService {
       String? blobToString(dynamic value) {
         if (value == null) return null;
         if (value is String) return value;
-        if (value is Blob) {
+        if (value is mysql.Blob) {
           return String.fromCharCodes(value.toString().codeUnits);
         }
         return value.toString();
@@ -1220,31 +1198,47 @@ class DatabaseService {
     }
   }
 
-  // Add this method to DatabaseService class
+  //profile page
+  Future<Map<String, dynamic>> getUserProfile(int userId) async {
+    final conn = await connection;
+    final result = await conn
+        .query('SELECT *, profile_picture FROM users WHERE id = ?', [userId]);
+    return result.first.fields;
+  }
+
+  // update user profile
   Future<void> updateUserProfile({
     required int userId,
     required String name,
     required String email,
     required String phone,
-    required String address,
+    String? profilePicture,
     String? gender,
   }) async {
     try {
       final conn = await connection;
       print('Updating profile for user ID: $userId');
 
-      await conn.query('''
+      String query = '''
         UPDATE users 
         SET 
           name = ?,
           email = ?,
           contact_number = ?,
-          address = ?,
-          gender = ?,
+          ${profilePicture != null ? 'profile_picture = ?,' : ''}
           updated_at = NOW()
         WHERE id = ?
-      ''', [name, email, phone, address, gender, userId]);
+      ''';
 
+      List<dynamic> params = [
+        name,
+        email,
+        phone,
+        if (profilePicture != null) profilePicture,
+        userId,
+      ];
+
+      await conn.query(query, params);
       print('Profile updated successfully');
     } catch (e) {
       print('Error updating profile: $e');
@@ -1267,5 +1261,25 @@ class DatabaseService {
     }
 
     return result.first.fields;
+  }
+
+  Future<Map<String, dynamic>?> getUserData(String userId) async {
+    try {
+      DocumentSnapshot doc = await _db.collection('users').doc(userId).get();
+      return doc.exists ? doc.data() as Map<String, dynamic> : null;
+    } catch (e) {
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+
+  Future<void> updateFirestoreUserProfile(
+      String userId, Map<String, dynamic> data) async {
+    try {
+      await _db.collection('users').doc(userId).update(data);
+    } catch (e) {
+      print('Error updating user profile: $e');
+      throw e;
+    }
   }
 }
