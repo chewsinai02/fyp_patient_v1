@@ -123,18 +123,16 @@ class _FamilyStatusPageState extends State<FamilyStatusPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _handleRefresh,
-                child: _buildContent(),
-              ),
+      body: Column(
+        children: [
+          _buildHeader(context),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: _buildContent(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -166,70 +164,89 @@ class _FamilyStatusPageState extends State<FamilyStatusPage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: _familyMembers.length,
-      itemBuilder: (context, index) {
-        final member = _familyMembers[index];
-        return _buildFamilyMemberCard(
-          name: member.name,
-          relation: member.relation,
-          status: member.status,
-          lastUpdate: member.lastUpdate,
-          color: member.statusColor,
-          imageUrl: member.imageUrl,
-          email: member.email,
-          memberId: member.id,
-        );
-      },
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: _familyMembers
+              .map((member) => _buildFamilyMemberCard(
+                    name: member.name,
+                    relation: member.relation,
+                    status: member.status,
+                    lastUpdate: member.lastUpdate,
+                    color: member.statusColor,
+                    imageUrl: member.imageUrl,
+                    email: member.email,
+                    memberId: member.id,
+                  ))
+              .toList(),
+        ),
+      ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(15, 19, 15, 15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.deepPurple,
+            Colors.deepPurple.shade300,
+          ],
+        ),
         borderRadius: const BorderRadius.vertical(
           bottom: Radius.circular(32),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
+            color: Colors.deepPurple.withOpacity(0.2),
+            blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios),
-                padding: EdgeInsets.zero,
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'Family Status',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios),
+                  padding: EdgeInsets.zero,
+                  style: IconButton.styleFrom(
+                    foregroundColor: Colors.white,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Track your family members\' health status',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16,
+                const Expanded(
+                  child: Text(
+                    'Family Status',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Track your family members\' health status',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 12,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
