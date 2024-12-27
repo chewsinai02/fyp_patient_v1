@@ -10,7 +10,13 @@ import 'settings_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
-  const ProfilePage({super.key, required this.userData});
+  final bool isFromMainLayout;
+
+  const ProfilePage({
+    super.key,
+    required this.userData,
+    this.isFromMainLayout = false,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -72,13 +78,13 @@ class _ProfilePageState extends State<ProfilePage> {
       expandedHeight: 240,
       pinned: true,
       backgroundColor: Colors.deepPurple,
-      leading: IconButton(
-        icon: const Icon(
-          Icons.arrow_back_ios,
-          color: Colors.white,
-        ),
-        onPressed: () => Navigator.pop(context),
-      ),
+      automaticallyImplyLeading: false,
+      leading: widget.isFromMainLayout
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
       actions: [
         _buildNotificationBadge(context),
         IconButton(

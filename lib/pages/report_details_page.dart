@@ -15,82 +15,148 @@ class ReportDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Report Details',
-          style: TextStyle(color: Colors.black),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.download_outlined, color: Colors.black),
-            onPressed: () => _downloadReport(context),
-          ),
-        ],
-      ),
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: DatabaseService.instance.getReportDetails(reportId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError || snapshot.data == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red[300],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Could not load report details',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Go Back'),
+      backgroundColor: Colors.grey[50],
+      body: CustomScrollView(
+        slivers: [
+          // Modern Header
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(15, 19, 15, 15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.deepPurple,
+                    Colors.deepPurple.shade300,
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
-            );
-          }
-
-          final report = snapshot.data!;
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildReportHeader(report),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _buildDoctorInfo(report),
-                      const SizedBox(height: 16),
-                      _buildVitalSigns(report),
-                      const SizedBox(height: 16),
-                      _buildDiagnosisSection(report),
-                      const SizedBox(height: 16),
-                      _buildTreatmentSection(report),
-                    ],
-                  ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios),
+                          padding: EdgeInsets.zero,
+                          style: IconButton.styleFrom(
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Report Details',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.download_outlined),
+                          onPressed: () => _downloadReport(context),
+                          style: IconButton.styleFrom(
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'View detailed medical report information',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                        height: 1,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          );
-        },
+          ),
+
+          // Content
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height - 150,
+              child: FutureBuilder<Map<String, dynamic>?>(
+                future: DatabaseService.instance.getReportDetails(reportId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError || snapshot.data == null) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Colors.red[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Could not load report details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Go Back'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final report = snapshot.data!;
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      children: [
+                        _buildReportHeader(report),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              _buildDoctorInfo(report),
+                              const SizedBox(height: 16),
+                              _buildVitalSigns(report),
+                              const SizedBox(height: 16),
+                              _buildDiagnosisSection(report),
+                              const SizedBox(height: 16),
+                              _buildTreatmentSection(report),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

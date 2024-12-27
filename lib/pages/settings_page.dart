@@ -393,26 +393,32 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildLogoutButton(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 0),
       child: ElevatedButton(
         onPressed: () => _handleLogout(context),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red.shade50,
-          foregroundColor: Colors.red,
-          elevation: 0,
+          backgroundColor: Colors.red.shade400,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          elevation: 2,
         ),
-        child: const Text(
-          'Logout',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout_rounded),
+            SizedBox(width: 8),
+            Text(
+              'Logout',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

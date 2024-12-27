@@ -32,76 +32,103 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            _buildCalendar(),
-            _buildTasksList(),
-          ],
-        ),
-      ),
-    );
-  }
+      backgroundColor: Colors.grey[50],
+      body: CustomScrollView(
+        slivers: [
+          // Modern Header
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(15, 19, 15, 15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.deepPurple,
+                    Colors.deepPurple.shade300,
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios),
+                          padding: EdgeInsets.zero,
+                          style: IconButton.styleFrom(
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Daily Tasks',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                widget.patientName,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              if (_calendarFormat == CalendarFormat.week) {
+                                _calendarFormat = CalendarFormat.month;
+                              } else {
+                                _calendarFormat = CalendarFormat.week;
+                              }
+                            });
+                          },
+                          icon: Icon(
+                            _calendarFormat == CalendarFormat.week
+                                ? Icons.calendar_view_month
+                                : Icons.calendar_view_week,
+                            color: Colors.white,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios),
-            padding: EdgeInsets.zero,
-          ),
-          Expanded(
+          // Calendar and Tasks Content
+          SliverToBoxAdapter(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  'Daily Tasks',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  widget.patientName,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                _buildCalendar(),
+                _buildTasksList(),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                if (_calendarFormat == CalendarFormat.week) {
-                  _calendarFormat = CalendarFormat.month;
-                } else {
-                  _calendarFormat = CalendarFormat.week;
-                }
-              });
-            },
-            icon: Icon(
-              _calendarFormat == CalendarFormat.week
-                  ? Icons.calendar_view_month
-                  : Icons.calendar_view_week,
-            ),
-            padding: EdgeInsets.zero,
           ),
         ],
       ),
@@ -155,7 +182,8 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
   Widget _buildTasksList() {
     final selectedDate = _selectedDay ?? DateTime.now();
 
-    return Expanded(
+    return SizedBox(
+      height: MediaQuery.of(context).size.height - 350,
       child: FutureBuilder<List<Map<String, dynamic>>>(
         future: DatabaseService.instance.getTasksByDate(
           widget.patientId,

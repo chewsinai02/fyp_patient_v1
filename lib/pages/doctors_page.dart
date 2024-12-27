@@ -43,93 +43,116 @@ class _DoctorsPageState extends State<DoctorsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: _doctors.length,
-                      itemBuilder: (context, index) {
-                        final doctor = _doctors[index];
-                        return GestureDetector(
-                          onTap: () async {
-                            final currentUserId =
-                                await AuthService.instance.getCurrentUserId();
-                            if (currentUserId != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatPage(
-                                    patientId: currentUserId,
-                                    otherUserId: doctor['id'],
-                                  ),
-                                ),
-                              );
-                            } else {
-                              print('User is not logged in');
-                            }
-                          },
-                          child: _buildDoctorCard(
-                            name: doctor['name'],
-                            specialty: doctor['specialty'] ?? 'N/A',
-                            experience: doctor['experience'] ?? 'N/A',
-                            rating: doctor['rating']?.toDouble() ?? 0.0,
-                            doctorId: doctor['id'],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios),
-                padding: EdgeInsets.zero,
+      backgroundColor: Colors.grey[50],
+      body: CustomScrollView(
+        slivers: [
+          // Modern Header
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(15, 19, 15, 15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.deepPurple,
+                    Colors.deepPurple.shade300,
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-              const Text(
-                'Our Doctors',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios),
+                          padding: EdgeInsets.zero,
+                          style: IconButton.styleFrom(
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Available Doctors',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Choose a doctor for your appointment',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                        height: 1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Meet our experienced doctors! Book and Chat with them!',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
             ),
+          ),
+
+          // Content
+          SliverToBoxAdapter(
+            child: _isLoading
+                ? const SizedBox(
+                    height: 500,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _doctors.length,
+                    itemBuilder: (context, index) {
+                      final doctor = _doctors[index];
+                      return GestureDetector(
+                        onTap: () async {
+                          final currentUserId =
+                              await AuthService.instance.getCurrentUserId();
+                          if (currentUserId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatPage(
+                                  patientId: currentUserId,
+                                  otherUserId: doctor['id'],
+                                ),
+                              ),
+                            );
+                          } else {
+                            print('User is not logged in');
+                          }
+                        },
+                        child: _buildDoctorCard(
+                          name: doctor['name'],
+                          specialty: doctor['specialty'] ?? 'N/A',
+                          experience: doctor['experience'] ?? 'N/A',
+                          doctorId: doctor['id'],
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -140,7 +163,6 @@ class _DoctorsPageState extends State<DoctorsPage> {
     required String name,
     required String specialty,
     required String experience,
-    required double rating,
     required int doctorId,
   }) {
     // Find the doctor data to get the profile picture
@@ -214,18 +236,6 @@ class _DoctorsPageState extends State<DoctorsPage> {
                 const SizedBox(height: 5),
                 Row(
                   children: [
-                    Icon(
-                      Icons.star,
-                      color: Colors.amber[700],
-                      size: 16,
-                    ),
-                    Text(
-                      ' $rating',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
                     Text(
                       experience,
                       style: TextStyle(
@@ -276,7 +286,7 @@ class _DoctorsPageState extends State<DoctorsPage> {
                       ),
                     ),
                   );
-                                },
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                   shape: RoundedRectangleBorder(

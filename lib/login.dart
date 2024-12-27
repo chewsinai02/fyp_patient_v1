@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'services/database_service.dart';
-import 'pages/main_layout.dart';
+import 'dashboard.dart';
+import 'widgets/main_layout.dart';
 import 'services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'utils/navigation_utils.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

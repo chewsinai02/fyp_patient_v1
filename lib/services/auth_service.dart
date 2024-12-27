@@ -98,4 +98,8 @@ class AuthService {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> getCurrentUserData() async {
+    return _currentUser;
+  }
 }

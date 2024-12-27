@@ -5,7 +5,12 @@ import 'package:intl/intl.dart';
 import 'pages/doctors_page.dart'; // Adjust the path as necessary
 
 class AppointmentPage extends StatefulWidget {
-  const AppointmentPage({super.key});
+  final bool isFromMainLayout;
+
+  const AppointmentPage({
+    super.key,
+    this.isFromMainLayout = false,
+  });
 
   @override
   State<AppointmentPage> createState() => _AppointmentPageState();
@@ -44,73 +49,98 @@ class _AppointmentPageState extends State<AppointmentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  _buildUpcomingAppointments(),
-                  const SizedBox(height: 24),
+      body: CustomScrollView(
+        slivers: [
+          // Modern Header
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(15, 19, 15, 15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.deepPurple,
+                    Colors.deepPurple.shade300,
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
                 ],
               ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (!widget.isFromMainLayout)
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.arrow_back_ios),
+                            padding: EdgeInsets.zero,
+                            style: IconButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        const Expanded(
+                          child: Text(
+                            'Appointments',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Schedule and manage your appointments',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+
+          // Content
+          SliverToBoxAdapter(
+            child: ListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24),
+              children: [
+                _buildUpcomingAppointments(),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-                builder: (context) => const DoctorsPage()), // Navigate to DoctorPage
+            MaterialPageRoute(builder: (context) => const DoctorsPage()),
           );
         },
         backgroundColor: Colors.deepPurple,
         label: const Text('+', style: TextStyle(color: Colors.white)),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(32),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios),
-                padding: EdgeInsets.zero,
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'Appointments',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

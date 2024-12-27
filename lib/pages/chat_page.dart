@@ -7,11 +7,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 class ChatPage extends StatefulWidget {
   final int patientId;
   final int otherUserId;
+  final bool isFromMainLayout;
 
   const ChatPage({
     super.key,
     required this.patientId,
     required this.otherUserId,
+    this.isFromMainLayout = false,
   });
 
   @override
@@ -123,10 +125,12 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         backgroundColor: Colors.deepPurple,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: widget.isFromMainLayout
+            ? null // Hide back button if from MainLayout
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: FutureBuilder<List<Message>>(
           future: _messagesFuture,
           builder: (context, snapshot) {

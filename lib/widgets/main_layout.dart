@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../dashboard.dart';
 import '../appointment_page.dart';
-import 'profile_page.dart';
+import '../pages/profile_page.dart';
 import '../services/auth_service.dart';
-import 'messages_page.dart';
+import '../pages/messages_page.dart';
 
 class MainLayout extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -23,9 +23,15 @@ class _MainLayoutState extends State<MainLayout> {
     super.initState();
     _pages = [
       DashboardContent(userData: widget.userData),
-      MessagesPage(patientId: widget.userData['id'] ?? 0),
-      const AppointmentPage(),
-      ProfilePage(userData: widget.userData),
+      MessagesPage(
+        patientId: widget.userData['id'] ?? 0,
+        isFromMainLayout: true,
+      ),
+      const AppointmentPage(isFromMainLayout: true),
+      ProfilePage(
+        userData: widget.userData,
+        isFromMainLayout: true,
+      ),
     ];
     AuthService.instance.setCurrentUser(widget.userData);
   }
@@ -38,28 +44,31 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: Container(
-        height: 65,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.15),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(Icons.home_rounded, 'Home', 0),
-            _buildNavItem(Icons.chat_bubble_rounded, 'Chat', 1),
-            _buildNavItem(Icons.calendar_month_rounded, 'Appointments', 2),
-            _buildNavItem(Icons.person_rounded, 'Profile', 3),
-          ],
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: Container(
+          height: 65,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.15),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home_rounded, 'Home', 0),
+              _buildNavItem(Icons.chat_bubble_rounded, 'Chat', 1),
+              _buildNavItem(Icons.calendar_month_rounded, 'Appointments', 2),
+              _buildNavItem(Icons.person_rounded, 'Profile', 3),
+            ],
+          ),
         ),
       ),
     );

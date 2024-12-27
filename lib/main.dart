@@ -11,6 +11,7 @@ import 'services/storage_service.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:typed_data';
+import 'dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,8 +60,9 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.deepPurple,
         fontFamily: 'Poppins',
       ),
-      home: const InitialPage(),
+      initialRoute: '/',
       routes: {
+        '/': (context) => const InitialPage(),
         '/login': (context) => const LoginPage(),
         '/settings': (context) => const SettingsPage(),
         '/edit-profile': (context) => const EditProfilePage(),

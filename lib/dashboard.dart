@@ -11,20 +11,25 @@ import 'services/storage_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'pages/edit_profile_page.dart';
 
-class DashboardPage extends StatefulWidget {
+class Dashboard extends StatefulWidget {
   final Map<String, dynamic> userData;
-  const DashboardPage({super.key, required this.userData});
+  const Dashboard({super.key, required this.userData});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<Dashboard> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<Dashboard> {
+  int _selectedIndex = 0;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: DashboardContent(userData: widget.userData),
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        body: DashboardContent(userData: widget.userData),
+      ),
     );
   }
 }

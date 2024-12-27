@@ -33,75 +33,142 @@ class _ReportPageState extends State<ReportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          '${widget.patientName}\'s Reports',
-          style: TextStyle(color: Colors.black),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _loadReports();
-          });
-        },
-        child: FutureBuilder<List<Map<String, dynamic>>>(
-          future: _reportsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text('Error: ${snapshot.error}'),
-                    TextButton(
-                      onPressed: () => setState(() => _loadReports()),
-                      child: const Text('Retry'),
-                    ),
+      backgroundColor: Colors.grey[50],
+      body: CustomScrollView(
+        slivers: [
+          // Modern Header
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(15, 19, 15, 15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.deepPurple,
+                    Colors.deepPurple.shade300,
                   ],
                 ),
-              );
-            }
-
-            final reports = snapshot.data ?? [];
-
-            if (reports.isEmpty) {
-              return Center(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.folder_open, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios),
+                          padding: EdgeInsets.zero,
+                          style: IconButton.styleFrom(
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Medical Reports',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Text(
-                      'No medical reports found',
-                      style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      'View your medical history and reports',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                        height: 1,
+                      ),
                     ),
                   ],
                 ),
-              );
-            }
+              ),
+            ),
+          ),
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: reports.length,
-              itemBuilder: (context, index) => _buildReportCard(reports[index]),
-            );
-          },
-        ),
+          // Content
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height - 150,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  setState(() {
+                    _loadReports();
+                  });
+                },
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _reportsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline,
+                                size: 48, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text('Error: ${snapshot.error}'),
+                            TextButton(
+                              onPressed: () => setState(() => _loadReports()),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final reports = snapshot.data ?? [];
+
+                    if (reports.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.folder_open,
+                                size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No medical reports found',
+                              style: TextStyle(
+                                  fontSize: 18, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: reports.length,
+                      itemBuilder: (context, index) =>
+                          _buildReportCard(reports[index]),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
