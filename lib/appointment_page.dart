@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
 import 'package:intl/intl.dart';
-import 'pages/doctors_page.dart'; // Adjust the path as necessary
 
 class AppointmentPage extends StatefulWidget {
   final bool isFromMainLayout;

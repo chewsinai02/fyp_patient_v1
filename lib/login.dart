@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'services/database_service.dart';
-import 'dashboard.dart';
 import 'widgets/main_layout.dart';
 import 'services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'utils/navigation_utils.dart';
 import 'package:fyp_patient_v1/utils/auth_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
@@ -14,6 +12,10 @@ import 'package:flutter/services.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 import 'package:bcrypt/bcrypt.dart';
+import 'dart:io';
+import 'package:mailer/smtp_server/gmail.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -43,11 +45,11 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await DatabaseService.instance.execute('''
         CREATE TABLE IF NOT EXISTS password_resets (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          email TEXT NOT NULL,
-          otp TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          used INTEGER DEFAULT 0
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          email VARCHAR(255) NOT NULL,
+          otp VARCHAR(6) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          used TINYINT(1) DEFAULT 0
         )
       ''');
       print('Password resets table created or already exists');
@@ -242,8 +244,6 @@ class _LoginPageState extends State<LoginPage> {
                                           return;
                                         }
 
-                                        Navigator.pop(context); // Close dialog
-
                                         // Show loading indicator
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
@@ -267,24 +267,7 @@ class _LoginPageState extends State<LoginPage> {
                                           ),
                                         );
 
-                                        final success =
-                                            await _sendPasswordResetEmail(
-                                                email);
-
-                                        if (mounted) {
-                                          if (success) {
-                                            _showOTPVerificationDialog(email);
-                                          } else {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    'Failed to send OTP. Please try again.'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          }
-                                        }
+                                        _handleResetPassword(context, email);
                                       },
                                       child: const Text(
                                         'Reset',
@@ -684,39 +667,129 @@ class _LoginPageState extends State<LoginPage> {
         return false;
       }
 
-      print('Sending email with OTP: $otp');
+      // Load and encode logo image
+      final ByteData logoData = await rootBundle.load('assets/images/logo.png');
+      final List<int> logoBytes = logoData.buffer.asUint8List();
+      final String logoBase64 = base64Encode(logoBytes);
 
-      // Use Mailtrap API with template
-      final response = await http.post(
-        Uri.parse('https://sandbox.api.mailtrap.io/api/send/2525051'),
-        headers: {
-          'Authorization': 'Bearer 853a313e02fdef0a2731e2f94ca6e26a',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          "from": {
-            "email": "hello@suchospitalchew.infinityfreeapp.com",
-            "name": "SUC Hospital"
-          },
-          "to": [
-            {"email": email}
-          ],
-          "template_uuid": "9ccd37a7-c58a-4a77-b9ed-39dca8fac97d",
-          "template_variables": {
-            "email": email,
-            "OTP": otp,
-            "company_info_address": "123 Hospital Street",
-            "company_info_city": "Kuching",
-            "company_info_zip_code": "93350",
-            "company_info_country": "Malaysia"
-          }
-        }),
-      );
+      // Gmail SMTP configuration
+      String username = 'chewsinai2002@gmail.com';
+      String password = 'bohv qjdl bjcq qktb';
 
-      print('API Response: ${response.body}');
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Error sending email: $e');
+      final smtpServer = gmail(username, password);
+
+      final message = Message()
+        ..from = Address(username, 'SUC Hospital')
+        ..recipients.add(email)
+        ..subject = 'Password Reset OTP'
+        ..html = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #673ab7;
+            color: white;
+            border-radius: 5px 5px 0 0;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 10px;
+            background-color: white;
+            border-radius: 50%;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .content {
+            padding: 20px;
+            background-color: white;
+            border-radius: 0 0 5px 5px;
+        }
+        .otp-code {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            color: #673ab7;
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="data:image/png;base64,$logoBase64" alt="SUC Hospital Logo">
+            </div>
+            <h1>SUC Hospital</h1>
+        </div>
+        <div class="content">
+            <h2>Password Reset Request</h2>
+            <p>Dear User,</p>
+            <p>We received a request to reset your password. Please use the following OTP code to proceed with your password reset:</p>
+            
+            <div class="otp-code">
+                $otp
+            </div>
+            
+            <p>This OTP will expire in 15 minutes. If you did not request this password reset, please ignore this email.</p>
+            
+            <p>For security reasons, please do not share this OTP with anyone.</p>
+            
+            <p>Best regards,<br>SUC Hospital Team</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p>© ${DateTime.now().year} SUC Hospital. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+''';
+
+      try {
+        final sendReport = await send(message, smtpServer);
+        print('Email sent: ${sendReport.toString()}');
+        return true;
+      } on MailerException catch (e) {
+        print('Failed to send email: ${e.message}');
+        for (var p in e.problems) {
+          print('Problem: ${p.code}: ${p.msg}');
+        }
+        return false;
+      }
+    } catch (e, stackTrace) {
+      print('\n=== Error Details ===');
+      print('Error: $e');
+      print('Stack Trace: $stackTrace');
       return false;
     }
   }
@@ -1010,5 +1083,66 @@ class _LoginPageState extends State<LoginPage> {
       print('Error verifying OTP: $e');
       return false;
     }
+  }
+
+  Future<void> _handleResetPassword(BuildContext context, String email) async {
+    if (!mounted) return;
+
+    try {
+      final success = await _sendPasswordResetEmail(email);
+
+      if (!mounted) return;
+
+      if (success) {
+        Navigator.pop(context); // Close the current dialog
+        _showOTPVerificationDialog(email);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to send OTP. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+Future<void> sendEmail(
+    BuildContext context, String recipientEmail, String otp) async {
+  String username = 'chewsinai2002@gmail.com'; // Your Email
+  String password =
+      'bohv qjdl bjcq qktb'; // 16 Digits App Password Generated From Google Account
+
+  final smtpServer = gmail(username, password);
+
+  // Create our message.
+  final message = Message()
+    ..from = Address(username, 'Confirmation Bot')
+    ..recipients.add(recipientEmail) // Dynamic recipient email
+    ..subject = 'Your OTP Code'
+    ..text = 'Hello dear,\n\nYour OTP code is: $otp\n\nThank you!';
+
+  try {
+    final sendReport = await send(message, smtpServer);
+    print('Message sent: ' + sendReport.toString());
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text("Mail sent successfully")));
+  } on MailerException catch (e) {
+    print('Message not sent.');
+    print(e.message);
+    for (var p in e.problems) {
+      print('Problem: ${p.code}: ${p.msg}');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to send mail: ${e.message}")));
   }
 }

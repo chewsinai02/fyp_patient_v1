@@ -9,7 +9,6 @@ import 'pages/messages_page.dart';
 import 'pages/settings_page.dart';
 import 'services/storage_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'pages/edit_profile_page.dart';
 
 class Dashboard extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -20,8 +19,6 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<Dashboard> {
-  int _selectedIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     return DashboardContent(userData: widget.userData);

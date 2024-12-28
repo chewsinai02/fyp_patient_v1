@@ -8,7 +8,6 @@ import 'pages/profile_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/doctors_page.dart';
 import 'services/auth_service.dart';
-import 'pages/messages_page.dart';
 import 'services/database_service.dart';
 
 class FunctionPage extends StatelessWidget {
