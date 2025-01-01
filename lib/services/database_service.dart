@@ -293,8 +293,8 @@ class DatabaseService {
   // Example method to fetch doctors
   Future<List<Map<String, dynamic>>> getDoctors() async {
     try {
-      print('=== FETCHING DOCTORS START ===');
       final conn = await connection;
+      print('Fetching doctors');
 
       const query = '''
         SELECT 
@@ -303,58 +303,53 @@ class DatabaseService {
           description,
           staff_id as experience,
           CAST(5.0 AS DECIMAL(3,1)) as rating,
-          COALESCE(profile_picture, '/images/default_avatar.png') as profile_picture
+          profile_picture
         FROM users 
         WHERE LOWER(role) = 'doctor'
       ''';
 
-      print('Executing query: $query');
       final results = await conn.query(query);
-      print('Raw results from database: ${results.length}');
-
       List<Map<String, dynamic>> doctors = [];
+
       for (var row in results) {
-        String specialty = 'General Practice';
-        try {
-          if (row['description'] != null) {
-            if (row['description'] is mysql.Blob) {
-              final blob = row['description'] as mysql.Blob;
-              specialty = String.fromCharCodes(blob.toString().codeUnits);
-            } else {
-              specialty = row['description'].toString();
-            }
-          }
-        } catch (e) {
-          print('Error converting description to string: $e');
-          specialty = 'General Practice';
+        // Convert Blob to String if necessary
+        String? description = row['description'] != null
+            ? (row['description'] is mysql.Blob
+                ? String.fromCharCodes(
+                    (row['description'] as mysql.Blob).toBytes())
+                : row['description'].toString())
+            : null;
+
+        // Process profile picture URL
+        String? profilePicture = row['profile_picture'] != null
+            ? (row['profile_picture'] is mysql.Blob
+                ? String.fromCharCodes(
+                    (row['profile_picture'] as mysql.Blob).toBytes())
+                : row['profile_picture'].toString())
+            : null;
+
+        // Only add 'assets/' prefix if it's not a Firebase URL or existing asset path
+        if (profilePicture != null &&
+            !profilePicture.startsWith('http') &&
+            !profilePicture.startsWith('assets/') &&
+            !profilePicture
+                .startsWith('https://firebasestorage.googleapis.com')) {
+          profilePicture = 'assets/$profilePicture';
         }
 
-        // Process profile picture path
-        String profilePicture =
-            row['profile_picture'] ?? '/images/default_avatar.png';
-        if (!profilePicture.startsWith('/')) {
-          profilePicture = '/$profilePicture';
-        }
-
-        final doctor = {
+        doctors.add({
           'id': row['id'],
-          'name': row['name'],
-          'specialty': specialty,
+          'name': row['name'].toString(),
+          'specialty': description ?? 'General Practice',
           'experience': row['experience']?.toString() ?? 'N/A',
           'rating': row['rating'] ?? 5.0,
           'profile_picture': profilePicture,
-        };
-        print('Processing doctor: $doctor');
-        doctors.add(doctor);
+        });
       }
 
-      print('=== FETCHING DOCTORS END ===');
-      print('Total doctors processed: ${doctors.length}');
       return doctors;
-    } catch (e, stackTrace) {
-      print('=== ERROR FETCHING DOCTORS ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      print('Error fetching doctors: $e');
       return [];
     }
   }
@@ -543,17 +538,18 @@ class DatabaseService {
   Future<void> markMessageAsRead(int senderId, int receiverId) async {
     try {
       final conn = await connection;
-      print(
-          'Marking messages as read - From Doctor: $senderId, To Patient: $receiverId');
+      print('Marking messages as read - From: $senderId, To: $receiverId');
 
-      // Update all unread messages from this sender to this receiver
+      // Update only unread messages (is_read = 1) where:
+      // 1. The current user is the receiver
+      // 2. The message is from the specific sender
       final result = await conn.query('''
         UPDATE messages 
         SET is_read = 0,
             updated_at = NOW() 
-        WHERE sender_id = ?  -- Doctor's ID
-          AND receiver_id = ?  -- Patient's ID
-          AND is_read = 1
+        WHERE sender_id = ?  -- Specific sender's ID
+          AND receiver_id = ?  -- Current user's ID (receiver)
+          AND is_read = 1  -- Only update unread messages
       ''', [senderId, receiverId]);
 
       print('Messages marked as read. Rows affected: ${result.affectedRows}');
@@ -579,11 +575,16 @@ class DatabaseService {
       ''';
 
       final doctorResults = await conn.query(doctorQuery);
-      Map<int, String> doctorProfiles = {};
+      Map<int, String?> doctorProfiles = {};
 
       for (var row in doctorResults) {
-        doctorProfiles[row['doctor_id']] =
-            row['profile_picture'] ?? '/images/default_avatar.png';
+        String? profilePicture = row['profile_picture'] != null
+            ? (row['profile_picture'] is mysql.Blob
+                ? String.fromCharCodes(
+                    (row['profile_picture'] as mysql.Blob).toBytes())
+                : row['profile_picture'].toString())
+            : null;
+        doctorProfiles[row['doctor_id']] = profilePicture;
       }
 
       // Then get the appointments
@@ -604,44 +605,46 @@ class DatabaseService {
         ORDER BY a.appointment_date ASC, a.appointment_time ASC
       ''';
 
-      print('Executing appointments query with patient ID: $patientId');
       final results = await conn.query(query, [patientId]);
-      print('Found ${results.length} appointments');
-
       List<Map<String, dynamic>> appointments = [];
+
       for (var row in results) {
         final doctorId = row['doctor_id'];
-        String profilePicture =
-            doctorProfiles[doctorId] ?? '/images/default_avatar.png';
+        String? profilePicture = doctorProfiles[doctorId];
 
-        // Ensure profile picture starts with a forward slash
-        if (!profilePicture.startsWith('/')) {
-          profilePicture = '/$profilePicture';
+        // Process profile picture URL - only add 'assets/' prefix for local assets
+        if (profilePicture != null &&
+            !profilePicture.startsWith('http') &&
+            !profilePicture.startsWith('assets/') &&
+            !profilePicture
+                .startsWith('https://firebasestorage.googleapis.com')) {
+          profilePicture = 'assets/$profilePicture';
         }
 
-        print(
-            'Processing appointment: ${row['id']} for doctor: ${row['doctor_name']}');
-        print('Doctor ID: $doctorId');
-        print('Profile picture path: $profilePicture');
+        // Convert specialty from Blob if necessary
+        String? specialty = row['specialty'] != null
+            ? (row['specialty'] is mysql.Blob
+                ? String.fromCharCodes(
+                    (row['specialty'] as mysql.Blob).toBytes())
+                : row['specialty'].toString())
+            : null;
 
         appointments.add({
           'id': row['id'],
           'doctor_id': doctorId,
-          'doctor_name': row['doctor_name'] ?? 'Unknown Doctor',
-          'specialty': row['specialty'] ?? 'General Practice',
+          'doctor_name': row['doctor_name']?.toString() ?? 'Unknown Doctor',
+          'specialty': specialty ?? 'General Practice',
           'appointment_date': row['appointment_date'],
           'appointment_time': row['appointment_time'],
-          'notes': row['notes'],
+          'notes': row['notes']?.toString(),
           'profile_picture': profilePicture,
-          'status': row['status'],
+          'status': row['status']?.toString(),
         });
       }
 
-      print('Processed ${appointments.length} appointments successfully');
       return appointments;
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('Error fetching appointments: $e');
-      print('Stack trace: $stackTrace');
       return [];
     }
   }

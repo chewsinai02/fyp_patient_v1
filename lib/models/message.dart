@@ -7,12 +7,12 @@ class Message {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isRead;
+  final int unreadCount;
   final String? senderName;
   final String? senderProfilePicture;
   final String? receiverName;
   final String? receiverProfilePicture;
-  final String? messageType;
-  final int unreadCount;
+  final String messageType; // 'text', 'image', or 'file'
 
   Message({
     required this.id,
@@ -23,45 +23,98 @@ class Message {
     required this.createdAt,
     required this.updatedAt,
     required this.isRead,
+    this.unreadCount = 0,
     this.senderName,
     this.senderProfilePicture,
     this.receiverName,
     this.receiverProfilePicture,
-    this.messageType,
-    this.unreadCount = 0,
+    this.messageType = 'text',
   });
 
   factory Message.fromMap(Map<String, dynamic> map) {
-    String? processImageUrl(String? url) {
-      if (url == null) return null;
-      if (url.startsWith('https://firebasestorage.googleapis.com')) {
-        return url; // Return Firebase URLs as-is
-      }
-      if (url.startsWith('assets/')) {
-        return url; // Return asset paths as-is
-      }
-      return 'assets/$url'; // Add assets/ prefix only if needed
-    }
-
     return Message(
-      id: map['id'],
-      senderId: map['sender_id'],
-      receiverId: map['receiver_id'],
-      message: map['message'],
-      image: map['image'], // Don't process the image URL for chat images
+      id: map['id'] as int,
+      senderId: map['sender_id'] as int,
+      receiverId: map['receiver_id'] as int,
+      message: map['message'] as String,
+      image: map['image'] as String?,
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
-      isRead: map['is_read'] == 1,
-      senderName: map['sender_name'],
-      senderProfilePicture: processImageUrl(map['sender_profile_picture']) ??
-          'assets/images/doctor_placeholder.png',
-      receiverName: map['receiver_name'],
-      receiverProfilePicture:
-          processImageUrl(map['receiver_profile_picture']) ??
-              'assets/images/doctor_placeholder.png',
-      messageType:
-          map['message_type'] ?? (map['image'] != null ? 'image' : 'text'),
-      unreadCount: map['unread_count'] ?? 0,
+      isRead: (map['is_read'] as int? ?? 0) == 0,
+      unreadCount: map['unread_count'] as int? ?? 0,
+      senderName: map['sender_name'] as String?,
+      senderProfilePicture: map['sender_profile_picture'] as String?,
+      receiverName: map['receiver_name'] as String?,
+      receiverProfilePicture: map['receiver_profile_picture'] as String?,
+      messageType: map['message_type'] as String? ?? 'text',
     );
+  }
+
+  String getFileIcon() {
+    if (image == null) return 'bi-file-earmark';
+
+    final filename = image!.toLowerCase();
+    if (filename.endsWith('.pdf')) return 'bi-file-earmark-pdf';
+    if (filename.endsWith('.doc') || filename.endsWith('.docx'))
+      return 'bi-file-earmark-word';
+    if (filename.endsWith('.xls') || filename.endsWith('.xlsx'))
+      return 'bi-file-earmark-excel';
+    if (filename.endsWith('.ppt') || filename.endsWith('.pptx'))
+      return 'bi-file-earmark-ppt';
+    if (filename.endsWith('.zip') || filename.endsWith('.rar'))
+      return 'bi-file-earmark-zip';
+    if (filename.endsWith('.txt')) return 'bi-file-earmark-text';
+    return 'bi-file-earmark';
+  }
+
+  bool get isImage {
+    if (image == null) return false;
+    final lowercaseUrl = image!.toLowerCase();
+
+    // Check file extensions
+    final extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
+    if (extensions.any((ext) => lowercaseUrl.endsWith(ext))) {
+      return true;
+    }
+
+    // Check for Firebase Storage image URLs
+    if (lowercaseUrl.contains('firebasestorage.googleapis.com')) {
+      if (lowercaseUrl.contains('image/') ||
+          lowercaseUrl.contains('/images/') ||
+          lowercaseUrl.contains('chat_images/')) {
+        return true;
+      }
+    }
+
+    // Check for direct image URLs
+    if (lowercaseUrl.contains('image/') ||
+        lowercaseUrl.contains('/images/') ||
+        Uri.tryParse(lowercaseUrl)?.hasAbsolutePath == true) {
+      try {
+        // Try to check if URL ends with image extension
+        final uri = Uri.parse(lowercaseUrl);
+        final path = uri.path.toLowerCase();
+        if (extensions.any((ext) => path.endsWith(ext))) {
+          return true;
+        }
+      } catch (e) {
+        print('Error parsing URL: $e');
+      }
+    }
+
+    return false;
+  }
+
+  String getFileName() {
+    if (image == null) return '';
+    final uri = Uri.parse(image!);
+    final path = uri.path;
+    final filename = path.split('/').last;
+    // Remove timestamp prefix if exists (file_1234567890_filename.ext)
+    final parts = filename.split('_');
+    if (parts.length > 2) {
+      return parts.sublist(2).join('_');
+    }
+    return filename;
   }
 }

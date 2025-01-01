@@ -3,6 +3,8 @@ import '../models/message.dart';
 import '../services/database_service.dart';
 import '../widgets/message_input.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../widgets/adaptive_image.dart';
 
 class ChatPage extends StatefulWidget {
   final int patientId;
@@ -32,11 +34,39 @@ class _ChatPageState extends State<ChatPage> {
     print('Doctor ID: ${widget.otherUserId}');
     _messagesFuture = _loadMessages();
 
+    // Add scroll listener for loading more messages
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+          _scrollController.position.maxScrollExtent) {
+        _loadMoreMessages();
+      }
+    });
+
     // Mark messages as read when entering chat
-    DatabaseService.instance.markMessageAsRead(
-      widget.otherUserId, // Doctor's ID (sender)
-      widget.patientId, // Current patient's ID (receiver)
-    );
+    _markMessagesAsRead();
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    try {
+      await DatabaseService.instance.markMessageAsRead(
+        widget.otherUserId, // Sender's ID
+        widget.patientId, // Current user's ID (receiver)
+      );
+      // Refresh messages to update read status
+      setState(() {
+        _messagesFuture = _loadMessages();
+      });
+    } catch (e) {
+      print('Error marking messages as read: $e');
+    }
+  }
+
+  // Add this to handle new messages
+  void _handleNewMessage() async {
+    await _markMessagesAsRead();
+    setState(() {
+      _messagesFuture = _loadMessages();
+    });
   }
 
   Future<List<Message>> _loadMessages() async {
@@ -94,7 +124,7 @@ class _ChatPageState extends State<ChatPage> {
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        0,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
@@ -116,6 +146,27 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       print('Error sending image message: $e');
     }
+  }
+
+  void _handleFileMessage(String fileUrl, String fileName) async {
+    try {
+      await DatabaseService().sendMessage(
+        senderId: widget.patientId,
+        receiverId: widget.otherUserId,
+        message: fileName,
+        image: fileUrl,
+        messageType: 'file',
+      );
+      setState(() {
+        _messagesFuture = _loadMessages();
+      });
+    } catch (e) {
+      print('Error sending file message: $e');
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    // Implement pagination logic here if needed
   }
 
   @override
@@ -147,12 +198,14 @@ class _ChatPageState extends State<ChatPage> {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundImage: otherUserProfilePicture != null
-                        ? AssetImage(otherUserProfilePicture)
-                        : const AssetImage(
-                            'assets/images/doctor_placeholder.png',
-                          ) as ImageProvider,
                     backgroundColor: Colors.white,
+                    child: AdaptiveImage(
+                      imageUrl: otherUserProfilePicture,
+                      fallbackAsset: 'assets/images/doctor_placeholder.png',
+                      circle: true,
+                      width: 40,
+                      height: 40,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -232,9 +285,9 @@ class _ChatPageState extends State<ChatPage> {
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: messages.length,
-                  reverse: false,
+                  reverse: true,
                   itemBuilder: (context, index) {
-                    final message = messages[index];
+                    final message = messages[messages.length - 1 - index];
                     final isPatient = message.senderId == widget.patientId;
 
                     return Padding(
@@ -249,13 +302,15 @@ class _ChatPageState extends State<ChatPage> {
                           if (!isPatient) ...[
                             CircleAvatar(
                               radius: 16,
-                              backgroundImage: message.senderProfilePicture !=
-                                      null
-                                  ? AssetImage(message.senderProfilePicture!)
-                                  : const AssetImage(
-                                          'assets/images/doctor_placeholder.png')
-                                      as ImageProvider,
                               backgroundColor: Colors.deepPurple.shade100,
+                              child: AdaptiveImage(
+                                imageUrl: message.senderProfilePicture,
+                                fallbackAsset:
+                                    'assets/images/doctor_placeholder.png',
+                                circle: true,
+                                width: 32,
+                                height: 32,
+                              ),
                             ),
                             const SizedBox(width: 8),
                           ],
@@ -317,6 +372,7 @@ class _ChatPageState extends State<ChatPage> {
           MessageInput(
             onSendMessage: _handleSendMessage,
             onSendImage: _handleImageMessage,
+            onSendFile: _handleFileMessage,
           ),
         ],
       ),
@@ -335,11 +391,11 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildMessageContent(Message message) {
-    if (message.messageType == 'image') {
+    if (message.messageType == 'image' || message.messageType == 'file') {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (message.message.isNotEmpty)
+          if (message.message.isNotEmpty && message.message != '[Image]')
             Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: Text(
@@ -351,26 +407,53 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
             ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: message.image ?? '',
-              width: 200,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                width: 200,
-                height: 150,
-                color: Colors.grey[300],
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (context, url, error) => Container(
-                width: 200,
-                height: 150,
-                color: Colors.grey[300],
-                child: const Icon(Icons.error),
-              ),
-            ),
-          ),
+          if (message.image != null)
+            if (_isImageUrl(message.image!))
+              // For images - show preview directly
+              GestureDetector(
+                onTap: () => _showFullScreenImage(context, message.image!),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.6,
+                    maxHeight: 200,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      message.image!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: double.infinity,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading image: $error');
+                        return Container(
+                          width: double.infinity,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.error),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              )
+            else
+              _buildFileDownloadButton(message),
         ],
       );
     } else {
@@ -383,6 +466,213 @@ class _ChatPageState extends State<ChatPage> {
           fontSize: 15,
         ),
       );
+    }
+  }
+
+  bool _isImageUrl(String url) {
+    final lowercaseUrl = url.toLowerCase();
+
+    // Check file extensions
+    final extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
+    if (extensions.any((ext) => lowercaseUrl.endsWith(ext))) {
+      return true;
+    }
+
+    // Check for Firebase Storage image URLs
+    if (lowercaseUrl.contains('firebasestorage.googleapis.com')) {
+      if (lowercaseUrl.contains('image/') ||
+          lowercaseUrl.contains('/images/') ||
+          lowercaseUrl.contains('chat_images/')) {
+        return true;
+      }
+    }
+
+    // Check for direct image URLs
+    if (lowercaseUrl.contains('image/') ||
+        lowercaseUrl.contains('/images/') ||
+        Uri.tryParse(lowercaseUrl)?.hasAbsolutePath == true) {
+      try {
+        // Try to check if URL ends with image extension
+        final uri = Uri.parse(lowercaseUrl);
+        final path = uri.path.toLowerCase();
+        if (extensions.any((ext) => path.endsWith(ext))) {
+          return true;
+        }
+
+        // Additional check for content-type in query parameters
+        if (uri.queryParameters.containsKey('type')) {
+          final type = uri.queryParameters['type']!.toLowerCase();
+          if (type.startsWith('image/')) {
+            return true;
+          }
+        }
+      } catch (e) {
+        print('Error parsing URL: $e');
+      }
+    }
+
+    // Try to validate URL by checking if it's a direct image link
+    try {
+      final uri = Uri.parse(url);
+      if (uri.hasAbsolutePath &&
+          !uri.path.endsWith('/') &&
+          !uri.path.contains('.php') &&
+          !uri.path.contains('.asp') &&
+          !uri.path.contains('.html')) {
+        final lastSegment = uri.pathSegments.last.toLowerCase();
+        if (extensions.any((ext) => lastSegment.endsWith(ext))) {
+          return true;
+        }
+      }
+    } catch (e) {
+      print('Error validating URL: $e');
+    }
+
+    return false;
+  }
+
+  Widget _buildFileDownloadButton(Message message) {
+    final fileName = message.getFileName();
+    final fileIcon = _getFileIcon(message.getFileIcon());
+    final isPatient = message.senderId == widget.patientId;
+
+    return InkWell(
+      onTap: () => _downloadFile(message.image!, fileName),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isPatient ? Colors.white.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isPatient ? Colors.white24 : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              fileIcon,
+              size: 24,
+              color: isPatient ? Colors.white : Colors.grey[700],
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName,
+                    style: TextStyle(
+                      color: isPatient ? Colors.white : Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tap to download',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isPatient ? Colors.white70 : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Icon(
+              Icons.download,
+              size: 20,
+              color: isPatient ? Colors.white70 : Colors.grey[600],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Semi-transparent background
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(color: Colors.black87),
+            ),
+            // Image with InteractiveViewer
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(child: CircularProgressIndicator());
+                  },
+                ),
+              ),
+            ),
+            // Close button
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadFile(String url, String filename) async {
+    try {
+      final result = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!result) {
+        throw 'Could not launch URL';
+      }
+    } catch (e) {
+      print('Error downloading file: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error downloading file: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  IconData _getFileIcon(String iconName) {
+    switch (iconName) {
+      case 'bi-file-earmark-pdf':
+        return Icons.picture_as_pdf;
+      case 'bi-file-earmark-word':
+        return Icons.description;
+      case 'bi-file-earmark-excel':
+        return Icons.table_chart;
+      case 'bi-file-earmark-ppt':
+        return Icons.slideshow;
+      case 'bi-file-earmark-zip':
+        return Icons.folder_zip;
+      case 'bi-file-earmark-text':
+        return Icons.text_snippet;
+      default:
+        return Icons.insert_drive_file;
     }
   }
 }

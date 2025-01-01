@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'widgets/main_layout.dart';
 import 'login.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'widgets/adaptive_image_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,12 @@ class MyApp extends StatelessWidget {
       title: 'SUC Hospital',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        extensions: [
+          AdaptiveImageTheme(
+            defaultFallbackAsset: 'assets/images/profile.png',
+            defaultLoadingColor: Colors.grey[200]!,
+          ),
+        ],
       ),
       home: FutureBuilder<bool>(
         future: AuthUtils.isLoggedIn(),

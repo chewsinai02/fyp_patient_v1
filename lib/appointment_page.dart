@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
 import 'package:intl/intl.dart';
+import '../widgets/adaptive_image.dart';
 
 class AppointmentPage extends StatefulWidget {
   final bool isFromMainLayout;
@@ -179,8 +180,6 @@ class _AppointmentPageState extends State<AppointmentPage> {
       orElse: () => {},
     );
 
-    final profilePicture = 'assets${appointment['profile_picture']}';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -197,30 +196,16 @@ class _AppointmentPageState extends State<AppointmentPage> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.deepPurple.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                profilePicture,
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  print('Error loading image: $error');
-                  print('Attempted path: $profilePicture');
-                  return const Icon(
-                    Icons.person,
-                    color: Colors.deepPurple,
-                    size: 30,
-                  );
-                },
-              ),
+          // Replace the old image widget with AdaptiveImage
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.deepPurple.shade50,
+            child: AdaptiveImage(
+              imageUrl: appointment['profile_picture'],
+              fallbackAsset: 'assets/images/doctor_placeholder.png',
+              circle: true,
+              width: 60,
+              height: 60,
             ),
           ),
           const SizedBox(width: 16),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/database_service.dart';
 import 'chat_page.dart';
+import '../widgets/adaptive_image.dart';
 
 class MessagesPage extends StatefulWidget {
   final int patientId;
@@ -244,24 +245,19 @@ class _MessagesPageState extends State<MessagesPage> {
                                   children: [
                                     CircleAvatar(
                                       radius: 28,
-                                      backgroundImage: message.senderId ==
-                                              widget.patientId
-                                          ? (message.receiverProfilePicture !=
-                                                  null
-                                              ? AssetImage(message
-                                                  .receiverProfilePicture!)
-                                              : const AssetImage(
-                                                      'assets/images/doctor_placeholder.png')
-                                                  as ImageProvider)
-                                          : (message.senderProfilePicture !=
-                                                  null
-                                              ? AssetImage(
-                                                  message.senderProfilePicture!)
-                                              : const AssetImage(
-                                                      'assets/images/doctor_placeholder.png')
-                                                  as ImageProvider),
                                       backgroundColor:
                                           Colors.deepPurple.shade50,
+                                      child: AdaptiveImage(
+                                        imageUrl:
+                                            message.senderId == widget.patientId
+                                                ? message.receiverProfilePicture
+                                                : message.senderProfilePicture,
+                                        fallbackAsset:
+                                            'assets/images/doctor_placeholder.png',
+                                        circle: true,
+                                        width: 56,
+                                        height: 56,
+                                      ),
                                     ),
                                     Positioned(
                                       right: 0,

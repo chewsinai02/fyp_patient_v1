@@ -3,6 +3,7 @@ import '../services/database_service.dart';
 import '../pages/booking_page.dart';
 import '../services/auth_service.dart';
 import '../pages/chat_page.dart';
+import '../widgets/adaptive_image.dart';
 
 class DoctorsPage extends StatefulWidget {
   const DoctorsPage({super.key});
@@ -171,8 +172,6 @@ class _DoctorsPageState extends State<DoctorsPage> {
       orElse: () => {},
     );
 
-    final profilePicture = 'assets${doctor['profile_picture']}';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
@@ -189,30 +188,15 @@ class _DoctorsPageState extends State<DoctorsPage> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.deepPurple.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                profilePicture,
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  print('Error loading image: $error');
-                  print('Attempted path: $profilePicture');
-                  return const Icon(
-                    Icons.person,
-                    size: 40,
-                    color: Colors.deepPurple,
-                  );
-                },
-              ),
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.deepPurple.shade50,
+            child: AdaptiveImage(
+              imageUrl: doctor['profile_picture'],
+              fallbackAsset: 'assets/images/doctor_placeholder.png',
+              circle: true,
+              width: 80,
+              height: 80,
             ),
           ),
           const SizedBox(width: 15),
