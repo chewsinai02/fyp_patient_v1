@@ -280,7 +280,7 @@ class _DashboardContentState extends State<DashboardContent> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
-                                    'Today\'s Tasks',
+                                    'Today\'s Services to Receive',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -304,7 +304,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Completed $completed of $total tasks',
+                                'Completed $completed of $total services',
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 14,

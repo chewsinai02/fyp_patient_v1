@@ -5,11 +5,26 @@ import 'widgets/main_layout.dart';
 import 'login.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'widgets/adaptive_image_theme.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize notifications first with proper error handling
+  try {
+    print('\n=== INITIALIZING NOTIFICATIONS ===');
+    final notificationService = NotificationService.instance;
+    await notificationService.initialize();
+    await notificationService.requestPermissions();
+    print('Notification service initialized successfully\n');
+  } catch (e) {
+    print('Error initializing notifications: $e');
+  }
+
   await Firebase.initializeApp();
   await dotenv.load(fileName: ".env");
+
   runApp(MyApp());
 }
 

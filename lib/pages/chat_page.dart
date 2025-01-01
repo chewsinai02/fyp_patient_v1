@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/adaptive_image.dart';
 import '../utils/time_utils.dart';
+import '../services/notification_service.dart';
 
 class ChatPage extends StatefulWidget {
   final int patientId;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:mysql1/mysql1.dart' as mysql;
 import 'package:dotenv/dotenv.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:bcrypt/bcrypt.dart';
 import '../utils/time_utils.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    as notifications;
+import '../services/notification_service.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -16,6 +20,8 @@ class DatabaseService {
   static const int _maxConnections = 5;
   static int _currentConnections = 0;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  Timer? _messageCheckTimer;
+  final Set<int> _notifiedMessageIds = {}; // Track notified message IDs
 
   DatabaseService._();
 
@@ -700,6 +706,45 @@ class DatabaseService {
       print('=== FETCHING MESSAGES ===');
       print('Between users: $userId1 and $userId2');
 
+      // First, get unread messages for notification
+      final unreadQuery = '''
+        SELECT 
+          m.*,
+          s.name as sender_name
+        FROM messages m
+        JOIN users s ON m.sender_id = s.id
+        WHERE m.receiver_id = ? 
+        AND m.sender_id = ?
+        AND m.is_read = 1
+        ORDER BY m.created_at DESC
+        LIMIT 1
+      ''';
+
+      final unreadResults = await conn.query(unreadQuery, [userId1, userId2]);
+
+      // Show notification for new unread message
+      if (unreadResults.isNotEmpty) {
+        final latestMessage = unreadResults.first;
+        final senderName = latestMessage['sender_name'] as String;
+        final messageText = latestMessage['message'] is mysql.Blob
+            ? String.fromCharCodes(
+                (latestMessage['message'] as mysql.Blob).toBytes())
+            : latestMessage['message']?.toString() ?? '';
+
+        print('\n=== NEW MESSAGE RECEIVED ===');
+        print('From: $senderName');
+        print('Message: $messageText');
+
+        // Show notification for new message
+        await NotificationService.instance.showMessageNotification(
+          title: 'New message from $senderName',
+          body: messageText,
+          payload:
+              '${latestMessage['sender_id']},${latestMessage['receiver_id']}',
+        );
+      }
+
+      // Get all messages as before
       const query = '''
         SELECT 
           m.*,
@@ -757,41 +802,57 @@ class DatabaseService {
   }) async {
     try {
       final conn = await connection;
-      print('Sending message:');
+      print('\n=== SENDING MESSAGE ===');
       print('From: $senderId');
       print('To: $receiverId');
-      print('Type: $messageType');
-      print('Image URL: $image');
+      print('Message: $message');
 
-      // Don't modify Firebase Storage URLs
-      final imageToStore = image != null &&
-              image.startsWith('https://firebasestorage.googleapis.com')
-          ? image
-          : image != null
-              ? 'assets/$image'
-              : null;
-
+      // Insert message into database
       await conn.query('''
         INSERT INTO messages (
-          sender_id, 
-          receiver_id, 
-          message, 
-          image, 
-          created_at, 
-          updated_at, 
-          is_read
-        ) VALUES (?, ?, ?, ?, CONVERT_TZ(NOW(), '+00:00', '+08:00'), CONVERT_TZ(NOW(), '+00:00', '+08:00'), 1)
-      ''', [
-        senderId,
-        receiverId,
-        message,
-        imageToStore,
-      ]);
+          sender_id, receiver_id, message, image, 
+          created_at, updated_at, is_read
+        ) VALUES (?, ?, ?, ?, NOW(), NOW(), 1)
+      ''', [senderId, receiverId, message, image]);
 
-      print(
-          'Message sent successfully at KL time: ${TimeUtils.formatMessageTime(TimeUtils.getNow())}');
+      // Show notification for the receiver
+      if (senderId != receiverId) {
+        print('\n=== TRIGGERING NOTIFICATION ===');
+
+        // Get sender details
+        final senderResult = await conn.query(
+          'SELECT name FROM users WHERE id = ?',
+          [senderId],
+        );
+
+        if (senderResult.isNotEmpty) {
+          final senderName = senderResult.first['name'] as String;
+
+          // Force notification service initialization
+          final notificationService = NotificationService.instance;
+          if (!notificationService.isInitialized) {
+            print('Initializing notification service...');
+            await notificationService.initialize();
+          }
+
+          print('Showing notification:');
+          print('Title: New message from $senderName');
+          print('Body: $message');
+
+          await notificationService.showMessageNotification(
+            title: 'New message from $senderName',
+            body: messageType == 'image' ? 'Sent an image' : message,
+            payload: '$senderId,$receiverId',
+          );
+
+          print('Notification sent successfully');
+        }
+      }
+
+      print('Message sent successfully');
     } catch (e) {
-      print('Error sending message: $e');
+      print('Error in sendMessage: $e');
+      print(e.toString());
       rethrow;
     }
   }
@@ -1332,6 +1393,284 @@ class DatabaseService {
     } catch (e) {
       print('Error updating password: $e');
       throw Exception('Failed to update password: $e');
+    }
+  }
+
+  Future<void> updateTaskStatus(int taskId, String newStatus) async {
+    final conn = await connection;
+    await conn.query(
+      'UPDATE tasks SET status = ? WHERE id = ?',
+      [newStatus, taskId],
+    );
+  }
+
+  // Add this method to start checking for new messages
+  Future<void> startMessageChecking(int userId) async {
+    print('\n=== STARTING MESSAGE CHECK SERVICE ===');
+    print('User ID: $userId');
+
+    // Cancel existing timer if any
+    _messageCheckTimer?.cancel();
+    _notifiedMessageIds.clear(); // Clear notification history
+
+    // Check every 5 seconds for new messages
+    _messageCheckTimer =
+        Timer.periodic(const Duration(seconds: 5), (timer) async {
+      try {
+        final conn = await connection;
+
+        // Query for new unread messages with more details
+        const query = '''
+          SELECT 
+            m.*,
+            s.name as sender_name,
+            s.profile_picture as sender_profile_picture
+          FROM messages m
+          JOIN users s ON m.sender_id = s.id
+          WHERE m.receiver_id = ?
+          AND m.is_read = 1
+          AND m.created_at >= DATE_SUB(NOW(), INTERVAL 6 SECOND)
+          ORDER BY m.created_at DESC
+        ''';
+
+        final results = await conn.query(query, [userId]);
+
+        if (results.isNotEmpty) {
+          print('\n=== NEW MESSAGES DETECTED ===');
+          print('Number of new messages: ${results.length}');
+
+          for (final row in results) {
+            final messageId = row['id'] as int;
+
+            // Skip if already notified
+            if (_notifiedMessageIds.contains(messageId)) {
+              print('Message $messageId already notified, skipping');
+              continue;
+            }
+
+            final senderName = row['sender_name'] as String;
+            final messageText = row['message'] is mysql.Blob
+                ? String.fromCharCodes((row['message'] as mysql.Blob).toBytes())
+                : row['message']?.toString() ?? '';
+            final messageType = row['image'] != null ? 'image' : 'text';
+
+            print('Processing message ID: $messageId');
+            print('From: $senderName');
+            print('Content: $messageText');
+            print('Type: $messageType');
+
+            // Show notification
+            try {
+              await NotificationService.instance.showMessageNotification(
+                title: 'New message from $senderName',
+                body: messageType == 'image' ? 'Sent an image' : messageText,
+                payload: '${row['sender_id']},${row['receiver_id']}',
+              );
+
+              // Mark as notified in memory
+              _notifiedMessageIds.add(messageId);
+              print('Notification sent for message $messageId');
+            } catch (notificationError) {
+              print('Error showing notification: $notificationError');
+            }
+          }
+        }
+      } catch (e, stackTrace) {
+        print('\n=== MESSAGE CHECK ERROR ===');
+        print('Error: $e');
+        print('Stack trace: $stackTrace');
+      }
+    });
+
+    print('Message check service started successfully\n');
+  }
+
+  // Add this method to stop checking messages
+  void stopMessageChecking() {
+    print('Stopping message checking');
+    _messageCheckTimer?.cancel();
+    _messageCheckTimer = null;
+  }
+
+  Future<List<Map<String, dynamic>>> checkUpcomingTasks(int userId) async {
+    try {
+      final conn = await connection;
+      print('\n=== CHECKING UPCOMING TASKS ===');
+      print('User ID: $userId');
+
+      // Ensure notification service is initialized
+      final notificationService = NotificationService.instance;
+      if (!notificationService.isInitialized) {
+        print('Initializing notification service...');
+        await notificationService.initialize();
+      }
+
+      // Get tasks for logged-in user
+      const personalTasksQuery = '''
+        SELECT 
+          t.*,
+          'personal' as task_type,
+          NULL as relationship,
+          NULL as family_member_name,
+          TIMESTAMPDIFF(MINUTE, CONVERT_TZ(NOW(), '+00:00', '+08:00'), t.due_date) as minutes_until_due
+        FROM tasks t
+        WHERE t.patient_id = ?
+          AND t.status = 'pending'
+          AND t.due_date > CONVERT_TZ(NOW(), '+00:00', '+08:00')
+          AND TIMESTAMPDIFF(MINUTE, CONVERT_TZ(NOW(), '+00:00', '+08:00'), t.due_date) <= 30
+          AND t.deleted_at IS NULL
+      ''';
+
+      // Get tasks for family members
+      const familyMembersQuery = '''
+        SELECT 
+          fm.id,
+          fm.user_id,
+          fm.relationship,
+          u.id as patient_id,
+          u.name
+        FROM family_members fm
+        JOIN users u ON u.id = fm.id
+        WHERE fm.user_id = ?
+      ''';
+
+      // Get tasks for family members
+      const familyTasksQuery = '''
+        SELECT 
+          t.*,
+          'family' as task_type,
+          fm.relationship,
+          u.name as family_member_name,
+          TIMESTAMPDIFF(MINUTE, CONVERT_TZ(NOW(), '+00:00', '+08:00'), t.due_date) as minutes_until_due
+        FROM tasks t
+        JOIN family_members fm ON t.patient_id = fm.id
+        JOIN users u ON t.patient_id = u.id
+        WHERE fm.user_id = ?
+          AND t.status = 'pending'
+          AND t.due_date > CONVERT_TZ(NOW(), '+00:00', '+08:00')
+          AND TIMESTAMPDIFF(MINUTE, CONVERT_TZ(NOW(), '+00:00', '+08:00'), t.due_date) <= 30
+          AND t.deleted_at IS NULL
+      ''';
+
+      // Add debug logging for family members
+      try {
+        final familyMembers = await conn.query(familyMembersQuery, [userId]);
+        print('\nFamily members for user $userId:');
+        for (final member in familyMembers) {
+          print('User ID: ${member['user_id']}, ' +
+              'Name: ${member['name']}, ' +
+              'Relationship: ${member['relationship']}');
+        }
+
+        // Then execute the tasks queries
+        final personalTasks = await conn.query(personalTasksQuery, [userId]);
+        final familyTasks = await conn.query(familyTasksQuery, [userId]);
+
+        print('\nFound ${personalTasks.length} personal tasks');
+        print('Found ${familyTasks.length} family tasks');
+
+        // Combine and convert results
+        final allTasks = [
+          ...personalTasks.map((row) => {
+                ...row.fields,
+                'task_type': 'personal',
+                'relationship': null,
+                'family_member_name': null,
+              }),
+          ...familyTasks.map((row) => {
+                ...row.fields,
+                'task_type': 'family',
+                'relationship': row['relationship'],
+                'family_member_name': row['family_member_name'],
+              }),
+        ];
+
+        // Show notifications for each task
+        for (final task in allTasks) {
+          try {
+            final dueDate = task['due_date'] as DateTime;
+            final minutesUntilDue = task['minutes_until_due'] as int;
+            final now = DateTime.now();
+
+            print('\nProcessing task notification:');
+            print('Task ID: ${task['id']}');
+            print('Title: ${task['title']}');
+            print('Current time: $now');
+            print('Due Date: $dueDate');
+            print('Minutes until due: $minutesUntilDue');
+            print('Type: ${task['task_type']}');
+            print('Status: ${task['status']}');
+
+            // Only show notification if task is really pending and due soon
+            if (task['status'] == 'pending' &&
+                minutesUntilDue > 0 &&
+                minutesUntilDue <= 30) {
+              if (task['task_type'] == 'family') {
+                print('Family Member: ${task['family_member_name']}');
+                print('Relationship: ${task['relationship']}');
+              }
+
+              // Create more urgent message for tasks due very soon
+              String urgencyPrefix;
+              if (minutesUntilDue <= 5) {
+                urgencyPrefix = '🚨 URGENT';
+              } else if (minutesUntilDue <= 15) {
+                urgencyPrefix = '⚠️ Warning';
+              } else {
+                urgencyPrefix = 'Reminder';
+              }
+
+              final title = task['task_type'] == 'personal'
+                  ? '$urgencyPrefix: Task Due Soon'
+                  : '$urgencyPrefix: ${task['family_member_name']}\'s Task Due Soon';
+
+              final body = task['task_type'] == 'personal'
+                  ? '${task['title']} - Due in ${_getTimeUntilDue(minutesUntilDue)}'
+                  : '${task['title']} - ${task['relationship']} - Due in ${_getTimeUntilDue(minutesUntilDue)}';
+
+              await notificationService.showMessageNotification(
+                title: title,
+                body: body,
+                payload: 'task_${task['id']}_${task['patient_id']}',
+              );
+
+              print('Notification sent successfully');
+            } else {
+              print('Skipping notification - Task not eligible');
+              print('Status: ${task['status']}');
+              print('Minutes until due: $minutesUntilDue');
+            }
+          } catch (e) {
+            print('Error processing task ${task['id']}: $e');
+          }
+        }
+
+        return allTasks;
+      } catch (e) {
+        print('Error checking upcoming tasks: $e');
+        print(e.toString());
+        return [];
+      }
+    } catch (e) {
+      print('Error checking upcoming tasks: $e');
+      print(e.toString());
+      return [];
+    }
+  }
+
+  String _getTimeUntilDue(int minutes) {
+    if (minutes <= 1) {
+      return 'less than a minute';
+    } else if (minutes < 60) {
+      return '$minutes minutes';
+    } else {
+      final hours = minutes ~/ 60;
+      final remainingMinutes = minutes % 60;
+      if (remainingMinutes == 0) {
+        return '$hours hour${hours > 1 ? 's' : ''}';
+      } else {
+        return '$hours hour${hours > 1 ? 's' : ''} and $remainingMinutes minute${remainingMinutes > 1 ? 's' : ''}';
+      }
     }
   }
 }

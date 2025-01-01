@@ -212,7 +212,7 @@ class FunctionPage extends StatelessWidget {
             const SizedBox(width: 16),
             Expanded(
               child: _buildFunctionCard(
-                title: 'Daily Tasks',
+                title: 'Daily Services',
                 icon: Icons.task_alt_outlined,
                 color: Colors.blue,
                 onTap: () {

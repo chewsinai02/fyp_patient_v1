@@ -3,15 +3,20 @@ import 'package:table_calendar/table_calendar.dart';
 import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
 
 class DailyTasksPage extends StatefulWidget {
   final int patientId;
   final String patientName;
+  final bool isPersonalTask;
 
   const DailyTasksPage({
     super.key,
     required this.patientId,
     required this.patientName,
+    this.isPersonalTask = false,
   });
 
   @override
@@ -25,6 +30,8 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
   final DateTime _lastDay = DateTime(2025, 12, 31);
   CalendarFormat _calendarFormat = CalendarFormat.week;
   bool _isLegendVisible = false;
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
@@ -42,6 +49,194 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
       _focusedDay = currentDate;
     }
     _selectedDay = _focusedDay;
+
+    // Initialize timezone and notifications
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    tz.initializeTimeZones();
+
+    // Create separate channels for personal and family tasks
+    const personalChannel = AndroidNotificationChannel(
+      'personal_tasks',
+      'Personal Tasks',
+      description: 'Notifications for your personal tasks',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    const familyChannel = AndroidNotificationChannel(
+      'family_tasks',
+      'Family Tasks',
+      description: 'Notifications for family member tasks',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    final androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    await androidImplementation?.createNotificationChannel(personalChannel);
+    await androidImplementation?.createNotificationChannel(familyChannel);
+
+    const androidInitializationSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInitializationSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initializationSettings = InitializationSettings(
+      android: androidInitializationSettings,
+      iOS: iosInitializationSettings,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        // Handle notification tap
+        final payload = response.payload;
+        if (payload != null) {
+          final parts = payload.split('_');
+          if (parts.length == 2) {
+            final patientId = int.parse(parts[0]);
+            final taskId = int.parse(parts[1]);
+            print('Notification tapped - Patient: $patientId, Task: $taskId');
+          }
+        }
+      },
+    );
+  }
+
+  Future<void> _scheduleTaskNotification(Map<String, dynamic> task) async {
+    print('\n=== SCHEDULING TASK NOTIFICATION ===');
+    print('Task ID: ${task['id']}');
+    print('Title: ${task['title']}');
+    print('Status: ${task['status']}');
+    print('Due Date: ${task['due_date']}');
+
+    final status = task['status'] as String;
+    if (status != 'pending') {
+      print('Skipping notification - task is not pending');
+      return;
+    }
+
+    final DateTime dueDate = task['due_date'] as DateTime;
+    final now = DateTime.now();
+
+    // Don't schedule if already passed
+    if (dueDate.isBefore(now)) return;
+
+    final taskId = task['id'] as int;
+    final title = task['title'] as String;
+    final priority = task['priority'] as String;
+
+    // Calculate time until due
+    final timeUntilDue = dueDate.difference(now);
+
+    // Schedule notification 30 minutes before due time
+    if (timeUntilDue.inMinutes > 30) {
+      final warningTime = dueDate.subtract(const Duration(minutes: 30));
+
+      try {
+        // Create notification details
+        final androidDetails = AndroidNotificationDetails(
+          widget.isPersonalTask ? 'personal_tasks' : 'family_tasks',
+          widget.isPersonalTask ? 'Personal Tasks' : 'Family Tasks',
+          channelDescription: widget.isPersonalTask
+              ? 'Notifications for your personal tasks'
+              : 'Notifications for family member tasks',
+          importance: Importance.high,
+          priority: Priority.high,
+          styleInformation: BigTextStyleInformation(''),
+          enableVibration: true,
+          playSound: true,
+          color: Colors.red,
+        );
+
+        final notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        );
+
+        // Create urgent notification message
+        final notificationTitle = widget.isPersonalTask
+            ? '⚠️ Task Due Soon: $title'
+            : '⚠️ ${widget.patientName}\'s Task Due Soon: $title';
+
+        final notificationBody = widget.isPersonalTask
+            ? 'URGENT: Task will pass in 30 minutes!\nPriority: ${priority.toUpperCase()}'
+            : 'URGENT: Family member task will pass in 30 minutes!\nPriority: ${priority.toUpperCase()}';
+
+        // Schedule the notification
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          taskId,
+          notificationTitle,
+          notificationBody,
+          tz.TZDateTime.from(warningTime, tz.local),
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: '${widget.patientId}_$taskId',
+        );
+
+        print('Warning notification scheduled for task: $title');
+        print('Due date: $dueDate');
+        print('Warning time: $warningTime');
+        print('For: ${widget.patientName}');
+      } catch (e) {
+        print('Error scheduling warning notification: $e');
+      }
+    }
+
+    // If task is very close to passing (less than 30 minutes), show immediate notification
+    if (timeUntilDue.inMinutes <= 30 && timeUntilDue.inMinutes > 0) {
+      try {
+        await flutterLocalNotificationsPlugin.show(
+          taskId,
+          widget.isPersonalTask
+              ? '🚨 URGENT: Task Almost Due!'
+              : '🚨 URGENT: Family Task Almost Due!',
+          'Task "$title" will pass in ${timeUntilDue.inMinutes} minutes!\nPriority: ${priority.toUpperCase()}',
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              widget.isPersonalTask ? 'personal_tasks' : 'family_tasks',
+              widget.isPersonalTask ? 'Personal Tasks' : 'Family Tasks',
+              channelDescription: 'Urgent task notifications',
+              importance: Importance.max,
+              priority: Priority.max,
+              enableVibration: true,
+              playSound: true,
+              color: Colors.red,
+              fullScreenIntent: true,
+            ),
+            iOS: const DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
+          ),
+          payload: '${widget.patientId}_$taskId',
+        );
+        print('Immediate warning sent for nearly passing task: $title');
+      } catch (e) {
+        print('Error showing immediate warning: $e');
+      }
+    }
+  }
+
+  Future<void> _cancelTaskNotification(int taskId) async {
+    await flutterLocalNotificationsPlugin.cancel(taskId);
   }
 
   @override
@@ -329,6 +524,14 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
           }
 
           final tasks = snapshot.data ?? [];
+
+          // Schedule notifications for pending tasks
+          for (final task in tasks) {
+            if (task['status'] == 'pending') {
+              _scheduleTaskNotification(task);
+            }
+          }
+
           if (tasks.isEmpty) {
             return Center(
               child: Column(
@@ -444,12 +647,42 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
               color: _getStatusColor(status).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              status.toUpperCase(),
-              style: TextStyle(
-                color: _getStatusColor(status),
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+            child: GestureDetector(
+              onTap: () async {
+                // Toggle task status
+                String newStatus;
+                if (status == 'pending') {
+                  newStatus = 'completed';
+                  // Cancel notification when task is completed
+                  await _cancelTaskNotification(task['id'] as int);
+                  print(
+                      'Cancelled notification for completed task: ${task['id']}');
+                } else if (status == 'completed') {
+                  newStatus = 'pending';
+                  // Schedule new notification when task is marked as pending
+                  await _scheduleTaskNotification(task);
+                  print(
+                      'Scheduled notification for pending task: ${task['id']}');
+                } else {
+                  return;
+                }
+
+                // Update task status in database
+                await DatabaseService.instance.updateTaskStatus(
+                  task['id'] as int,
+                  newStatus,
+                );
+
+                // Refresh the tasks list
+                setState(() {});
+              },
+              child: Text(
+                status.toUpperCase(),
+                style: TextStyle(
+                  color: _getStatusColor(status),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),

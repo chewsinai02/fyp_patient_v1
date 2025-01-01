@@ -5,6 +5,8 @@ import '../pages/profile_page.dart';
 import '../services/auth_service.dart';
 import '../pages/messages_page.dart';
 import '../pages/doctors_page.dart';
+import '../services/database_service.dart';
+import 'dart:async';
 
 class MainLayout extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -18,6 +20,7 @@ class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
 
   late final List<Widget> _pages;
+  Timer? _taskCheckTimer;
 
   @override
   void initState() {
@@ -35,6 +38,36 @@ class _MainLayoutState extends State<MainLayout> {
       ),
     ];
     AuthService.instance.setCurrentUser(widget.userData);
+
+    // Start checking for new messages
+    final userId = widget.userData['id'] as int;
+    DatabaseService.instance.startMessageChecking(userId);
+
+    _startTaskChecking();
+  }
+
+  @override
+  void dispose() {
+    // Stop checking for messages when widget is disposed
+    DatabaseService.instance.stopMessageChecking();
+    _taskCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startTaskChecking() {
+    print('Starting task check service...');
+
+    // Check every 30 seconds for upcoming tasks
+    _taskCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      final userId = widget.userData['id'] as int;
+      print('\nPeriodic task check triggered for user: $userId');
+      DatabaseService.instance.checkUpcomingTasks(userId);
+    });
+
+    // Also check immediately
+    final userId = widget.userData['id'] as int;
+    print('Initial task check for user: $userId');
+    DatabaseService.instance.checkUpcomingTasks(userId);
   }
 
   void _onItemTapped(int index) {
