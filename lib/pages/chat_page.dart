@@ -5,6 +5,7 @@ import '../widgets/message_input.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/adaptive_image.dart';
+import '../utils/time_utils.dart';
 
 class ChatPage extends StatefulWidget {
   final int patientId;
@@ -348,12 +349,13 @@ class _ChatPageState extends State<ChatPage> {
                                   _buildMessageContent(message),
                                   const SizedBox(height: 4),
                                   Text(
-                                    formatTime(message.createdAt),
+                                    TimeUtils.getTimeAgo(message.createdAt),
                                     style: TextStyle(
-                                      fontSize: 11,
-                                      color: isPatient
-                                          ? Colors.white70
-                                          : Colors.black45,
+                                      fontSize: 12,
+                                      color:
+                                          message.senderId == widget.patientId
+                                              ? Colors.white70
+                                              : Colors.grey[600],
                                     ),
                                   ),
                                 ],

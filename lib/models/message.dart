@@ -1,3 +1,5 @@
+import '../utils/time_utils.dart';
+
 class Message {
   final int id;
   final int senderId;
@@ -32,14 +34,18 @@ class Message {
   });
 
   factory Message.fromMap(Map<String, dynamic> map) {
+    // Convert timestamps to KL time
+    final createdAt = TimeUtils.parseFromDatabase(map['created_at'].toString());
+    final updatedAt = TimeUtils.parseFromDatabase(map['updated_at'].toString());
+
     return Message(
       id: map['id'] as int,
       senderId: map['sender_id'] as int,
       receiverId: map['receiver_id'] as int,
       message: map['message'] as String,
       image: map['image'] as String?,
-      createdAt: DateTime.parse(map['created_at']),
-      updatedAt: DateTime.parse(map['updated_at']),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
       isRead: (map['is_read'] as int? ?? 0) == 0,
       unreadCount: map['unread_count'] as int? ?? 0,
       senderName: map['sender_name'] as String?,

@@ -3,6 +3,7 @@ import '../models/message.dart';
 import '../services/database_service.dart';
 import 'chat_page.dart';
 import '../widgets/adaptive_image.dart';
+import '../utils/time_utils.dart';
 
 class MessagesPage extends StatefulWidget {
   final int patientId;
@@ -309,20 +310,11 @@ class _MessagesPageState extends State<MessagesPage> {
                                             ),
                                           ),
                                           Text(
-                                            formatTime(message.createdAt),
+                                            TimeUtils.getTimeAgo(
+                                                message.createdAt),
                                             style: TextStyle(
+                                              color: Colors.grey[600],
                                               fontSize: 12,
-                                              fontWeight:
-                                                  message.unreadCount > 0 &&
-                                                          message.receiverId ==
-                                                              widget.patientId
-                                                      ? FontWeight.bold
-                                                      : FontWeight.normal,
-                                              color: message.unreadCount > 0 &&
-                                                      message.receiverId ==
-                                                          widget.patientId
-                                                  ? Colors.blue
-                                                  : Colors.grey[600],
                                             ),
                                           ),
                                         ],
@@ -394,16 +386,5 @@ class _MessagesPageState extends State<MessagesPage> {
         ],
       ),
     );
-  }
-
-  String formatTime(DateTime dateTime) {
-    final difference = DateTime.now().difference(dateTime);
-    if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
   }
 }

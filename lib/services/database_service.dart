@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:bcrypt/bcrypt.dart';
+import '../utils/time_utils.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -538,18 +539,14 @@ class DatabaseService {
   Future<void> markMessageAsRead(int senderId, int receiverId) async {
     try {
       final conn = await connection;
-      print('Marking messages as read - From: $senderId, To: $receiverId');
 
-      // Update only unread messages (is_read = 1) where:
-      // 1. The current user is the receiver
-      // 2. The message is from the specific sender
       final result = await conn.query('''
         UPDATE messages 
         SET is_read = 0,
-            updated_at = NOW() 
-        WHERE sender_id = ?  -- Specific sender's ID
-          AND receiver_id = ?  -- Current user's ID (receiver)
-          AND is_read = 1  -- Only update unread messages
+            updated_at = CONVERT_TZ(NOW(), '+00:00', '+08:00')
+        WHERE sender_id = ?
+          AND receiver_id = ?
+          AND is_read = 1
       ''', [senderId, receiverId]);
 
       print('Messages marked as read. Rows affected: ${result.affectedRows}');
@@ -795,9 +792,6 @@ class DatabaseService {
               ? 'assets/$image'
               : null;
 
-      final timestamp = DateTime.now().toUtc().toString();
-
-      // Remove message_type from the query until column is added
       await conn.query('''
         INSERT INTO messages (
           sender_id, 
@@ -807,17 +801,16 @@ class DatabaseService {
           created_at, 
           updated_at, 
           is_read
-        ) VALUES (?, ?, ?, ?, ?, ?, 0)
+        ) VALUES (?, ?, ?, ?, CONVERT_TZ(NOW(), '+00:00', '+08:00'), CONVERT_TZ(NOW(), '+00:00', '+08:00'), 1)
       ''', [
         senderId,
         receiverId,
         message,
         imageToStore,
-        timestamp,
-        timestamp,
       ]);
 
-      print('Message sent successfully');
+      print(
+          'Message sent successfully at KL time: ${TimeUtils.formatMessageTime(TimeUtils.getNow())}');
     } catch (e) {
       print('Error sending message: $e');
       rethrow;
