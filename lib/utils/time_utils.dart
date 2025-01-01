@@ -82,4 +82,8 @@ class TimeUtils {
     final d2 = ensureKLTimeZone(date2);
     return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
   }
+
+  static DateTime getLocalTime() {
+    return DateTime.now().toUtc().add(const Duration(hours: 8)); // KL is UTC+8
+  }
 }

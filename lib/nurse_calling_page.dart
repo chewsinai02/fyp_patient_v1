@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import '../services/database_service.dart';
+import '../utils/time_utils.dart';
 
 class NurseCallingPage extends StatefulWidget {
   const NurseCallingPage({
@@ -35,11 +37,57 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
   Timer? _locationTimer;
   String? _activeCallId;
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
+  StreamSubscription? _callStatusSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToCallStatus();
+  }
 
   @override
   void dispose() {
     _locationTimer?.cancel();
+    _callStatusSubscription?.cancel();
     super.dispose();
+  }
+
+  void _listenToCallStatus() {
+    _callStatusSubscription =
+        _databaseRef.child('nurse_calls').onChildChanged.listen((event) async {
+      if (!mounted) return;
+
+      final callData = event.snapshot.value as Map?;
+      if (callData == null) return;
+
+      if (callData['patient_id'] == widget.patientId &&
+          callData['call_status'] == false &&
+          callData['attended_by'] != null) {
+        if (context.mounted) {
+          _locationTimer?.cancel();
+          _locationTimer = null;
+
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Nurse Has Arrived'),
+              content: const Text(
+                  'Your responsible nurse has attended to your call.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    });
   }
 
   Future<void> _updateLocation() async {
@@ -65,20 +113,88 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
   }
 
   Future<void> _handleEmergencyCall(BuildContext context) async {
-    // Validate if there's an assigned nurse and current shift
-    if (widget.assignedNurseId == null || widget.currentShift == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No nurse is currently assigned to this room'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
     try {
+      print('\n=== EMERGENCY CALL VALIDATION ===');
+      print('Patient ID: ${widget.patientId}');
+      print('Room ID: ${widget.roomId}');
+      print('Room Number: ${widget.roomNumber}');
+      print('Floor: ${widget.floor}');
+      print('Assigned Nurse ID: ${widget.assignedNurseId}');
+      print('Current Shift: ${widget.currentShift}');
+
+      // First check room info
+      final conn = await DatabaseService.instance.connection;
+      final roomQuery = '''
+        SELECT room_number, floor 
+        FROM rooms 
+        WHERE id = ?
+      ''';
+
+      final roomInfo = await conn.query(roomQuery, [widget.roomId]);
+      print('\n=== ROOM INFO ===');
+      print('Room query result: ${roomInfo.first.fields}');
+
+      // Fix type casting
+      final correctRoomNumber =
+          int.parse(roomInfo.first['room_number'].toString());
+      final correctFloor = int.parse(roomInfo.first['floor'].toString());
+
+      print('Parsed room info:');
+      print('Room Number: $correctRoomNumber');
+      print('Floor: $correctFloor');
+
+      // Then check nurse schedule with correct column names
+      final nurseAssignmentQuery = '''
+        SELECT 
+          ns.*,
+          u.name as nurse_name,
+          r.room_number,
+          r.floor
+        FROM nurse_schedules ns
+        JOIN users u ON ns.nurse_id = u.id
+        JOIN rooms r ON ns.room_id = r.id
+        WHERE ns.room_id = ?
+          AND ns.shift = ?
+          AND DATE(CONVERT_TZ(NOW(), '+00:00', '+08:00')) = DATE(ns.date)
+          AND (
+            (ns.shift = 'morning' AND HOUR(CONVERT_TZ(NOW(), '+00:00', '+08:00')) >= 7 AND HOUR(CONVERT_TZ(NOW(), '+00:00', '+08:00')) < 15) OR
+            (ns.shift = 'afternoon' AND HOUR(CONVERT_TZ(NOW(), '+00:00', '+08:00')) >= 16 AND HOUR(CONVERT_TZ(NOW(), '+00:00', '+08:00')) < 23) OR
+            (ns.shift = 'night' AND (HOUR(CONVERT_TZ(NOW(), '+00:00', '+08:00')) >= 23 OR HOUR(CONVERT_TZ(NOW(), '+00:00', '+08:00')) < 7))
+          )
+        LIMIT 1
+      ''';
+
+      // Add debug logging
+      print('\n=== CHECKING NURSE ASSIGNMENT ===');
+      print('Room ID: ${widget.roomId}');
+      print('Current Shift: ${getCurrentShift()}');
+      print('Current Time: ${TimeUtils.getLocalTime()}');
+
+      final assignments = await conn
+          .query(nurseAssignmentQuery, [widget.roomId, getCurrentShift()]);
+
+      if (assignments.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'No nurse is currently assigned to this room for the current shift'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final assignment = assignments.first;
+      final nurseId = assignment['nurse_id'];
+      final nurseName = assignment['nurse_name'];
+
+      print('Found nurse assignment:');
+      print('Nurse ID: $nurseId');
+      print('Nurse Name: $nurseName');
+      print('Shift: ${assignment['shift']}');
+
       // Request location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -90,6 +206,7 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
       }
 
       // Show loading indicator
+      if (!context.mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -104,22 +221,22 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
           desiredAccuracy: LocationAccuracy.high,
         );
 
-        // Get new call ID with 'call_' prefix
+        // Get new call ID
         final callRef = _databaseRef.child('nurse_calls').push();
         final callId = 'call_${callRef.key}';
         _activeCallId = callId;
 
-        // Create emergency call data with correct field values
+        // Create emergency call data
         final callData = {
           'patient_id': widget.patientId,
-          'assigned_nurse_id': widget.assignedNurseId,
+          'assigned_nurse_id': nurseId,
           'attended_at': null,
           'attended_by': null,
           'bed_id': widget.bedId,
           'bed_number': widget.bedNumber,
           'room_id': widget.roomId,
-          'floor': widget.floor,
-          'current_shift': widget.currentShift,
+          'floor': correctFloor,
+          'current_shift': getCurrentShift(),
           'call_status': true,
           'locations': {
             'latitude': position.latitude,
@@ -127,16 +244,20 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
             'updated_at': ServerValue.timestamp,
           },
           'patient_name': widget.patientName,
-          'room_number': widget.roomNumber,
+          'room_number': correctRoomNumber,
           'timestamp': ServerValue.timestamp,
         };
 
-        // Push data to 'nurse_calls' node with the call_ prefix
         await _databaseRef.child('nurse_calls').child(callId).set(callData);
 
-        // Hide loading indicator
         if (context.mounted) {
           Navigator.pop(context); // Remove loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Emergency call sent to nurse: $nurseName'),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
 
         // Start location updates
@@ -312,23 +433,44 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
           // Get all nurse calls
           final snapshot = await _databaseRef.child('nurse_calls').get();
 
-          // Update call_status to false for this patient's active calls
           if (snapshot.exists) {
             final calls = snapshot.value as Map;
             for (var callKey in calls.keys) {
               final call = calls[callKey] as Map;
               if (call['patient_id'] == widget.patientId &&
                   call['call_status'] == true) {
+                // Check if nurse already attended
+                if (call['attended_by'] != null) {
+                  if (context.mounted) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Nurse Already Attending'),
+                        content: const Text(
+                            'A nurse is already on their way to assist you.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                // If not attended, allow cancellation
                 await _databaseRef
                     .child('nurse_calls')
                     .child(callKey)
                     .update({'call_status': false});
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
               }
             }
-          }
-
-          if (context.mounted) {
-            Navigator.pop(context);
           }
         } catch (e) {
           debugPrint('Error canceling nurse call: $e');
@@ -342,5 +484,14 @@ class _NurseCallingPageState extends State<NurseCallingPage> {
         ),
       ),
     );
+  }
+
+  String getCurrentShift() {
+    final now = TimeUtils.getLocalTime(); // Gets KL time
+    final hour = now.hour;
+
+    if (hour >= 7 && hour < 15) return 'morning'; // 7 AM - 3 PM
+    if (hour >= 16 && hour < 23) return 'afternoon'; // 4 PM - 11 PM
+    return 'night'; // 11 PM - 7 AM
   }
 }
