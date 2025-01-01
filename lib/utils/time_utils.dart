@@ -12,13 +12,13 @@ class TimeUtils {
 
   // Format date for display
   static String formatDate(DateTime date) {
-    final klTime = _ensureKLTimeZone(date);
+    final klTime = ensureKLTimeZone(date);
     return DateFormat('yyyy-MM-dd').format(klTime);
   }
 
   // Format time for display
   static String formatTime(DateTime time) {
-    final klTime = _ensureKLTimeZone(time);
+    final klTime = ensureKLTimeZone(time);
     return DateFormat('HH:mm:ss').format(klTime);
   }
 
@@ -35,7 +35,7 @@ class TimeUtils {
   }
 
   // Ensure time is in KL timezone
-  static DateTime _ensureKLTimeZone(DateTime dateTime) {
+  static DateTime ensureKLTimeZone(DateTime dateTime) {
     if (!dateTime.isUtc) {
       dateTime = dateTime.toUtc();
     }
@@ -44,7 +44,7 @@ class TimeUtils {
 
   // Format for message display
   static String formatMessageTime(DateTime dateTime) {
-    final klTime = _ensureKLTimeZone(dateTime);
+    final klTime = ensureKLTimeZone(dateTime);
     return DateFormat('h:mm a').format(klTime);
   }
 
@@ -52,7 +52,7 @@ class TimeUtils {
   static String getTimeAgo(DateTime dateTime) {
     final now = getNow(); // Use getNow() to get current KL time
     final messageTime =
-        _ensureKLTimeZone(dateTime); // Ensure message time is in KL timezone
+        ensureKLTimeZone(dateTime); // Ensure message time is in KL timezone
     final difference = now.difference(messageTime);
 
     if (difference.inSeconds < 0) {
@@ -68,5 +68,18 @@ class TimeUtils {
     } else {
       return formatDate(messageTime);
     }
+  }
+
+  // Add this method to TimeUtils class
+  static String formatTaskTime(DateTime time) {
+    final klTime = ensureKLTimeZone(time);
+    return DateFormat('h:mm a').format(klTime); // Format as "9:30 AM"
+  }
+
+  // Add this method for task date comparison
+  static bool isSameDate(DateTime date1, DateTime date2) {
+    final d1 = ensureKLTimeZone(date1);
+    final d2 = ensureKLTimeZone(date2);
+    return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
   }
 }

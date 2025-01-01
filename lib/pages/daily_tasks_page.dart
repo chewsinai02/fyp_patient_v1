@@ -19,13 +19,28 @@ class DailyTasksPage extends StatefulWidget {
 }
 
 class _DailyTasksPageState extends State<DailyTasksPage> {
+  late DateTime _focusedDay;
+  late DateTime _selectedDay;
+  final DateTime _firstDay = DateTime(2024, 1, 1);
+  final DateTime _lastDay = DateTime(2025, 12, 31);
   CalendarFormat _calendarFormat = CalendarFormat.week;
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
+  bool _isLegendVisible = false;
 
   @override
   void initState() {
     super.initState();
+    // Initialize with current date or first day if out of range
+    final now = DateTime.now();
+    final currentDate = DateTime(now.year, now.month, now.day);
+
+    // Ensure the focused day is within the valid range
+    if (currentDate.isAfter(_lastDay)) {
+      _focusedDay = _lastDay;
+    } else if (currentDate.isBefore(_firstDay)) {
+      _focusedDay = _firstDay;
+    } else {
+      _focusedDay = currentDate;
+    }
     _selectedDay = _focusedDay;
   }
 
@@ -125,7 +140,165 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                _buildCalendar(),
+                Container(
+                  color: Colors.white,
+                  child: TableCalendar<dynamic>(
+                    firstDay: _firstDay,
+                    lastDay: _lastDay,
+                    focusedDay: _focusedDay,
+                    currentDay: DateTime.now(),
+                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                    calendarFormat: _calendarFormat,
+                    startingDayOfWeek: StartingDayOfWeek.monday,
+                    onDaySelected: (selectedDay, focusedDay) {
+                      if (!isSameDay(_selectedDay, selectedDay)) {
+                        setState(() {
+                          _selectedDay = selectedDay;
+                          _focusedDay = selectedDay;
+                        });
+                      }
+                    },
+                    onFormatChanged: (format) {
+                      setState(() {
+                        _calendarFormat = format;
+                      });
+                    },
+                    onPageChanged: (focusedDay) {
+                      setState(() {
+                        _focusedDay = focusedDay;
+                      });
+                    },
+                    calendarStyle: const CalendarStyle(
+                      selectedDecoration: BoxDecoration(
+                        color: Colors.deepPurple,
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: Colors.deepPurpleAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      outsideDaysVisible: false,
+                    ),
+                    headerStyle: const HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Legend',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          _isLegendVisible
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          size: 20,
+                          color: Colors.grey[600],
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isLegendVisible = !_isLegendVisible;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedCrossFade(
+                  firstChild: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Status:',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _buildLegendItem(
+                                Icons.check_circle,
+                                'Completed',
+                                Colors.green,
+                              ),
+                              _buildLegendItem(
+                                Icons.access_time,
+                                'Pending',
+                                Colors.orange,
+                              ),
+                              _buildLegendItem(
+                                Icons.warning,
+                                'Passed',
+                                Colors.red,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Priority:',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _buildLegendItem(
+                                Icons.priority_high,
+                                'Urgent',
+                                Colors.red,
+                              ),
+                              _buildLegendItem(
+                                Icons.arrow_upward,
+                                'High',
+                                Colors.orange,
+                              ),
+                              _buildLegendItem(
+                                Icons.remove,
+                                'Medium',
+                                Colors.yellow[700]!,
+                              ),
+                              _buildLegendItem(
+                                Icons.arrow_downward,
+                                'Low',
+                                Colors.green,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  secondChild: const SizedBox.shrink(),
+                  crossFadeState: _isLegendVisible
+                      ? CrossFadeState.showFirst
+                      : CrossFadeState.showSecond,
+                  duration: const Duration(milliseconds: 300),
+                ),
                 _buildTasksList(),
               ],
             ),
@@ -135,66 +308,28 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
     );
   }
 
-  Widget _buildCalendar() {
-    return Container(
-      color: Colors.white,
-      child: TableCalendar(
-        firstDay: DateTime.utc(2024, 1, 1),
-        lastDay: DateTime.utc(2024, 12, 31),
-        focusedDay: _focusedDay,
-        calendarFormat: _calendarFormat,
-        selectedDayPredicate: (day) {
-          return isSameDay(_selectedDay, day);
-        },
-        onDaySelected: (selectedDay, focusedDay) {
-          if (!isSameDay(_selectedDay, selectedDay)) {
-            setState(() {
-              _selectedDay = selectedDay;
-              _focusedDay = focusedDay;
-            });
-          }
-        },
-        onFormatChanged: (format) {
-          if (_calendarFormat != format) {
-            setState(() {
-              _calendarFormat = format;
-            });
-          }
-        },
-        onPageChanged: (focusedDay) {
-          _focusedDay = focusedDay;
-        },
-        calendarStyle: const CalendarStyle(
-          selectedDecoration: BoxDecoration(
-            color: Colors.deepPurple,
-            shape: BoxShape.circle,
-          ),
-          todayDecoration: BoxDecoration(
-            color: Colors.deepPurpleAccent,
-            shape: BoxShape.circle,
-          ),
-        ),
-        headerVisible: false,
-      ),
-    );
-  }
-
   Widget _buildTasksList() {
-    final selectedDate = _selectedDay ?? DateTime.now();
-
     return SizedBox(
-      height: MediaQuery.of(context).size.height - 350,
+      height:
+          MediaQuery.of(context).size.height - (_isLegendVisible ? 450 : 350),
       child: FutureBuilder<List<Map<String, dynamic>>>(
         future: DatabaseService.instance.getTasksByDate(
           widget.patientId,
-          selectedDate: selectedDate,
+          selectedDate: _selectedDay,
         ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
+
+          final tasks = snapshot.data ?? [];
+          if (tasks.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -202,60 +337,30 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
                   Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'No tasks for ${DateFormat('MMM d, yyyy').format(selectedDate)}',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                    ),
+                    'No tasks for ${DateFormat('MMM d').format(_selectedDay)}',
+                    style: TextStyle(color: Colors.grey[600]),
                   ),
                 ],
               ),
             );
           }
 
-          final tasks = snapshot.data!;
           return ListView.builder(
             padding: const EdgeInsets.all(20),
             itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              final dueDateTime = task['due_date'] as DateTime;
-              final timeString = DateFormat('h:mm a').format(dueDateTime);
-              final status = task['status'] as String;
-              final priority = task['priority'] as String;
-
-              // Check if this is a recurring task
-              final isRecurring = tasks
-                  .where((t) =>
-                      t['title'] == task['title'] &&
-                      t['due_date'] != task['due_date'])
-                  .isNotEmpty;
-
-              return _buildTaskCard(
-                title: task['title'],
-                time: timeString,
-                isCompleted: status == 'completed',
-                status: status,
-                priority: priority,
-                description: task['description'],
-                isRecurring: isRecurring,
-              );
-            },
+            itemBuilder: (context, index) => _buildTaskCard(tasks[index]),
           );
         },
       ),
     );
   }
 
-  Widget _buildTaskCard({
-    required String title,
-    required String time,
-    required bool isCompleted,
-    required String status,
-    required String priority,
-    String? description,
-    bool isRecurring = false,
-  }) {
+  Widget _buildTaskCard(Map<String, dynamic> task) {
+    final dueDateTime = task['due_date'] as DateTime;
+    final timeString = DateFormat('h:mm a').format(dueDateTime);
+    final status = task['status'] as String;
+    final priority = task['priority'] as String;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -285,14 +390,6 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
                   _getStatusIcon(status),
                   color: _getStatusColor(status),
                 ),
-                if (isRecurring) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.repeat,
-                    color: Colors.deepPurple,
-                    size: 16,
-                  ),
-                ],
                 const SizedBox(width: 4),
                 Icon(
                   _getPriorityIcon(priority),
@@ -308,25 +405,27 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  task['title'],
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    decoration: isCompleted ? TextDecoration.lineThrough : null,
+                    decoration: task['status'] == 'completed'
+                        ? TextDecoration.lineThrough
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  time,
+                  timeString,
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,
                   ),
                 ),
-                if (description?.isNotEmpty ?? false) ...[
+                if (task['description']?.isNotEmpty ?? false) ...[
                   const SizedBox(height: 4),
                   Text(
-                    description!,
+                    task['description'],
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 12,
@@ -413,5 +512,28 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
       default:
         return Icons.remove;
     }
+  }
+
+  Widget _buildLegendItem(IconData icon, String label, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

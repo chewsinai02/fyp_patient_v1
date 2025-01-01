@@ -203,88 +203,67 @@ class DatabaseService {
   //calendar page
   Future<List<Map<String, dynamic>>> getTasksByDate(
     int patientId, {
-    DateTime? selectedDate,
+    required DateTime selectedDate,
   }) async {
     try {
       final conn = await connection;
-      print('=== FETCHING TASKS START ===');
+      print('\n=== FETCHING TASKS START ===');
       print('Patient ID: $patientId');
+      print('Selected Date: $selectedDate');
 
-      // Use selected date or default to today
-      final date = selectedDate ?? DateTime.now();
-      final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+      // Format the date to match MySQL date format
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
 
-      // Simplified query to get tasks for the specific date
       const query = '''
         SELECT 
-          id, 
-          title, 
-          description, 
-          status, 
-          priority,
-          due_date,
-          room_id
-        FROM tasks 
-        WHERE patient_id = ? 
-        AND DATE(due_date) = ?
-        AND deleted_at IS NULL
-        ORDER BY TIME(due_date) ASC
+          t.id,
+          t.title,
+          t.description,
+          t.due_date,
+          t.status,
+          t.priority,
+          t.room_id,
+          CASE 
+            WHEN t.status = 'completed' THEN 'completed'
+            WHEN t.due_date < NOW() THEN 'passed'
+            ELSE 'pending'
+          END as current_status
+        FROM tasks t
+        WHERE t.patient_id = ? 
+        AND DATE(t.due_date) = ?
+        AND t.deleted_at IS NULL
+        ORDER BY t.due_date ASC
       ''';
 
-      print('Executing Query with parameters:');
-      print('Patient ID: $patientId');
-      print('Selected Date: $formattedDate');
-
       final results = await conn.query(query, [patientId, formattedDate]);
-
-      print('Raw Results Count: ${results.length}');
+      print('Found ${results.length} tasks');
 
       List<Map<String, dynamic>> tasks = [];
-
       for (var row in results) {
-        DateTime? dueDate;
-        if (row['due_date'] != null) {
-          if (row['due_date'] is DateTime) {
-            dueDate = row['due_date'];
-          } else {
-            try {
-              dueDate = DateTime.parse(row['due_date'].toString());
-            } catch (e) {
-              print('Error parsing due_date: ${row['due_date']}');
-              print('Error: $e');
-            }
-          }
-        }
+        // Convert any BLOB fields to String
+        String? description = row['description'] != null
+            ? (row['description'] is mysql.Blob
+                ? String.fromCharCodes(
+                    (row['description'] as mysql.Blob).toBytes())
+                : row['description'].toString())
+            : null;
 
-        String convertToString(dynamic value) {
-          if (value == null) return '';
-          if (value is mysql.Blob) {
-            return String.fromCharCodes(value.toBytes());
-          }
-          return value.toString();
-        }
-
-        final task = {
+        tasks.add({
           'id': row['id'],
+          'title': row['title'],
+          'description': description,
+          'due_date': row['due_date'],
+          'status': row['current_status'], // Use the calculated status
+          'priority': row['priority'],
           'room_id': row['room_id'],
-          'title': convertToString(row['title']),
-          'description': row['description'] != null
-              ? convertToString(row['description'])
-              : null,
-          'status': convertToString(row['status']),
-          'priority': convertToString(row['priority']),
-          'due_date': dueDate,
-        };
-
-        print('Processed Task: $task');
-        tasks.add(task);
+        });
       }
 
-      print('Total Tasks Found: ${tasks.length}');
-      print('=== FETCHING TASKS END ===');
+      print('Tasks processed successfully');
+      print('=== FETCHING TASKS END ===\n');
       return tasks;
     } catch (e, stackTrace) {
-      print('=== ERROR FETCHING TASKS ===');
+      print('\n=== ERROR FETCHING TASKS ===');
       print('Error: $e');
       print('Stack trace: $stackTrace');
       return [];

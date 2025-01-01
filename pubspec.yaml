@@ -20,6 +20,7 @@ version: 1.0.0+1
 
 environment:
   sdk: '>=3.4.4 <4.0.0'
+  flutter: ">=3.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -60,6 +61,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   flutter_dotenv: ^5.2.1
   flutter_email_sender: ^6.0.3
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

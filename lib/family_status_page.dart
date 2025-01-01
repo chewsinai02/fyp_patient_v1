@@ -457,34 +457,76 @@ class _FamilyStatusPageState extends State<FamilyStatusPage> {
   }
 
   Widget _buildAvatar(String imageUrl) {
-    final Widget image =
-        imageUrl.startsWith('http') || imageUrl.startsWith('https')
-            ? Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.person);
-                },
-              )
-            : Image.asset(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.person);
-                },
-              );
+    Widget imageWidget;
 
-    return CircleAvatar(
-      radius: 30,
-      backgroundColor: Colors.grey[200],
-      child: ClipOval(
-        child: SizedBox(
-          width: 60,
-          height: 60,
-          child: image,
+    try {
+      // Clean the URL by removing 'assets/' prefix if it exists
+      final cleanUrl = imageUrl.replaceFirst(RegExp(r'^assets/'), '');
+
+      if (cleanUrl.startsWith('http') || cleanUrl.startsWith('https')) {
+        // For network images (including GIFs)
+        imageWidget = Image.network(
+          cleanUrl,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            print('Error loading image: $error');
+            return const Icon(
+              Icons.person,
+              size: 35,
+              color: Colors.grey,
+            );
+          },
+        );
+      } else {
+        // For asset images
+        imageWidget = Image.asset(
+          cleanUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print('Error loading asset image: $error');
+            return const Icon(
+              Icons.person,
+              size: 35,
+              color: Colors.grey,
+            );
+          },
+        );
+      }
+
+      return CircleAvatar(
+        radius: 30,
+        backgroundColor: Colors.grey[200],
+        child: ClipOval(
+          child: SizedBox(
+            width: 60,
+            height: 60,
+            child: imageWidget,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      print('Avatar building error: $e');
+      return CircleAvatar(
+        radius: 30,
+        backgroundColor: Colors.grey[200],
+        child: const Icon(
+          Icons.person,
+          size: 35,
+          color: Colors.grey,
+        ),
+      );
+    }
   }
 
   void _showFamilyMemberReport(int memberId, String name) {
