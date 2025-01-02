@@ -22,6 +22,7 @@ class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   Timer? _messageCheckTimer;
   final Set<int> _notifiedMessageIds = {}; // Track notified message IDs
+  final Set<int> _notifiedTaskIds = {}; // Track notified task IDs
 
   DatabaseService._();
 
@@ -1588,12 +1589,20 @@ class DatabaseService {
         // Show notifications for each task
         for (final task in allTasks) {
           try {
+            final taskId = task['id'] as int;
+
+            // Skip if already notified
+            if (_notifiedTaskIds.contains(taskId)) {
+              print('Task $taskId already notified, skipping');
+              continue;
+            }
+
             final dueDate = task['due_date'] as DateTime;
             final minutesUntilDue = task['minutes_until_due'] as int;
             final now = DateTime.now();
 
             print('\nProcessing task notification:');
-            print('Task ID: ${task['id']}');
+            print('Task ID: $taskId');
             print('Title: ${task['title']}');
             print('Current time: $now');
             print('Due Date: $dueDate');
@@ -1601,7 +1610,7 @@ class DatabaseService {
             print('Type: ${task['task_type']}');
             print('Status: ${task['status']}');
 
-            // Only show notification if task is really pending and due soon
+            // Only show notification if task is pending and due soon
             if (task['status'] == 'pending' &&
                 minutesUntilDue > 0 &&
                 minutesUntilDue <= 30) {
@@ -1631,10 +1640,12 @@ class DatabaseService {
               await notificationService.showMessageNotification(
                 title: title,
                 body: body,
-                payload: 'task_${task['id']}_${task['patient_id']}',
+                payload: 'task_${taskId}_${task['patient_id']}',
               );
 
-              print('Notification sent successfully');
+              // Add to notified set after successful notification
+              _notifiedTaskIds.add(taskId);
+              print('Task $taskId marked as notified');
             } else {
               print('Skipping notification - Task not eligible');
               print('Status: ${task['status']}');
