@@ -90,7 +90,7 @@ class _ReportsPageState extends State<ReportsPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'View and manage your medical reports',
+                      'View and manage medical reports',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 12,
@@ -164,7 +164,7 @@ class _ReportsPageState extends State<ReportsPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Your medical reports will appear here',
+                              'Medical reports will appear here',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[500],
