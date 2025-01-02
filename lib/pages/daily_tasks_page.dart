@@ -288,7 +288,7 @@ class _DailyTasksPageState extends State<DailyTasksPage> {
                           child: Column(
                             children: [
                               const Text(
-                                'Daily Tasks',
+                                'Daily Services',
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
